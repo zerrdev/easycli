@@ -5,7 +5,6 @@ import path from 'path';
 
 const CONFIG_FILENAME = '.easycli.yml';
 const TEMPLATE = `# EasyCLI Configuration
-# See https://github.com/zerrbox/easycli for more info
 
 groups:
   web:
