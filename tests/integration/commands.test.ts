@@ -16,6 +16,7 @@ import os from 'node:os';
 import { upCommand } from '../../src/commands/up.js';
 import { lsCommand } from '../../src/commands/ls.js';
 import { downCommand } from '../../src/commands/down.js';
+import { groupsCommand } from '../../src/commands/groups.js';
 
 describe('CLI Commands Integration Tests', () => {
   let testConfigDir: string;
@@ -574,6 +575,35 @@ groups:
       // Should handle gracefully - tool is treated as direct executable
       assert.strictEqual(exitCode, 0);
       assert.ok(getLogOutput().includes('Tool: nonexistent-tool'));
+    });
+  });
+
+  describe('groupsCommand', () => {
+    it('should list group names in simple mode', async () => {
+      const configContent = `
+groups:
+  web:
+    tool: docker
+    restart: no
+    items:
+      - nginx
+      - redis
+
+  database:
+    tool: docker
+    restart: yes
+    items:
+      - postgres
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+      resetOutput();
+
+      const exitCode = await groupsCommand(false);
+
+      assert.strictEqual(exitCode, 0);
+      const output = getLogOutput();
+      assert.ok(output.includes('web'));
+      assert.ok(output.includes('database'));
     });
   });
 });
