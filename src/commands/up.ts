@@ -25,6 +25,8 @@ export async function upCommand(groupName: string): Promise<number> {
     const cleanup = () => {
       console.log('\nShutting down...');
       manager.killAll();
+      process.removeListener('SIGINT', cleanup);
+      process.removeListener('SIGTERM', cleanup);
       resolve(0);
     };
 
