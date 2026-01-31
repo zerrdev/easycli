@@ -605,5 +605,46 @@ groups:
       assert.ok(output.includes('web'));
       assert.ok(output.includes('database'));
     });
+
+    it('should show detailed table in verbose mode', async () => {
+      const configContent = `
+tools:
+  docker:
+    cmd: docker run
+
+groups:
+  web:
+    tool: docker
+    restart: unless-stopped
+    items:
+      - nginx
+      - redis
+      - postgres
+
+  direct:
+    tool: node
+    restart: no
+    items:
+      - server.js
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+      resetOutput();
+
+      const exitCode = await groupsCommand(true);
+
+      assert.strictEqual(exitCode, 0);
+      const output = getLogOutput();
+      assert.ok(output.includes('GROUP'));
+      assert.ok(output.includes('TOOL'));
+      assert.ok(output.includes('RESTART'));
+      assert.ok(output.includes('ITEMS'));
+      assert.ok(output.includes('web'));
+      assert.ok(output.includes('docker'));
+      assert.ok(output.includes('unless-stopped'));
+      assert.ok(output.includes('3')); // item count for web
+      assert.ok(output.includes('direct'));
+      assert.ok(output.includes('node'));
+      assert.ok(output.includes('1')); // item count for direct
+    });
   });
 });
