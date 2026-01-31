@@ -50,10 +50,12 @@ groups:
 ## Usage
 
 ```bash
-easycli config        # Open config file in editor
-easycli up <group>    # Start all processes in group
-easycli ls <group>    # List group items
-easycli down <group>  # Stop group (Ctrl+C also works)
+easycli config              # Open config file in editor
+easycli up <group>          # Start all processes in group
+easycli ls <group>          # List group items
+easycli down <group>        # Stop group (Ctrl+C also works)
+easycli groups              # List all groups
+easycli groups -v           # List groups with details
 ```
 
 ## Restart Policies
