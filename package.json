@@ -9,9 +9,10 @@
   "author": "zerr <gabriel@zerr.dev>",
   "license": "MIT",
   "scripts": {
-    "dev": "esbuild src/index.ts --watch --bundle --format=esm --platform=node --outfile=dist/index.js --sourcemap",
-    "build": "esbuild src/index.ts --bundle --format=esm --platform=node --outfile=dist/index.js --minify",
-    "typecheck": "tsc --noEmit"
+    "build": "node scripts/build.js",
+    "typecheck": "tsc --noEmit",
+    "test": "node scripts/test.js",
+    "test:verbose": "node scripts/test.js --verbose"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
