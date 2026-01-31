@@ -87,7 +87,16 @@ export class ProcessManager {
     // Restart after delay
     setTimeout(() => {
       console.log(`[${item.name}] Restarting... (exit code: ${code})`);
-      this.spawnProcess(item, groupName, restartPolicy);
+      const newProc = this.spawnProcess(item, groupName, restartPolicy);
+
+      // Update the ManagedProcess in the groups Map with the new process handle
+      const processes = this.groups.get(groupName);
+      if (processes) {
+        const managedProc = processes.find(mp => mp.item.name === item.name);
+        if (managedProc) {
+          managedProc.process = newProc;
+        }
+      }
     }, 1000);
   }
 
