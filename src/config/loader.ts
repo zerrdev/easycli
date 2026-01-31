@@ -1,7 +1,10 @@
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
 import type { EasyCliConfig, GroupConfig, ToolConfig } from './types.js';
+
+const CONFIG_FILENAME = '.easycli.yml';
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -13,13 +16,33 @@ export class ConfigError extends Error {
 export class ConfigLoader {
   private configPath: string;
 
-  constructor(configPath: string = 'easycli.yml') {
-    this.configPath = path.resolve(configPath);
+  constructor(configPath?: string) {
+    if (configPath) {
+      // User provided explicit path
+      this.configPath = path.resolve(configPath);
+    } else {
+      // Auto-detect: home dir first, then current dir
+      const homeDirConfig = path.join(os.homedir(), CONFIG_FILENAME);
+      const currentDirConfig = path.resolve(CONFIG_FILENAME);
+
+      if (fs.existsSync(homeDirConfig)) {
+        this.configPath = homeDirConfig;
+      } else if (fs.existsSync(currentDirConfig)) {
+        this.configPath = currentDirConfig;
+      } else {
+        // Store home dir as default, will error in load()
+        this.configPath = homeDirConfig;
+      }
+    }
   }
 
   load(): EasyCliConfig {
     if (!fs.existsSync(this.configPath)) {
-      throw new ConfigError(`Config file not found: ${this.configPath}`);
+      throw new ConfigError(
+        `Config file not found. Looking for:\n` +
+        `  - ${path.join(os.homedir(), CONFIG_FILENAME)}\n` +
+        `  - ${path.resolve(CONFIG_FILENAME)}`
+      );
     }
 
     const content = fs.readFileSync(this.configPath, 'utf-8');
