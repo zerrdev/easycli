@@ -10,7 +10,14 @@ npm install -g easycli
 
 ## Configuration
 
-Create an `easycli.yml` in your project root:
+Create a `.easycli.yml` configuration file. EasyCLI looks for the config in:
+
+1. **User home directory** (`~/.easycli.yml`) - checked first
+2. **Current directory** (`./.easycli.yml`) - fallback
+
+You can keep a global config in your home directory and override it per project.
+
+Example config:
 
 ```yaml
 tools:

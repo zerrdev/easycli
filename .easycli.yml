@@ -1,0 +1,21 @@
+tools:
+  kubefwd:
+    cmd: kubectl port-forward $1 $2:$3
+  sshfwd:
+    cmd: ssh -L $1:localhost:$2 name.dnydns-server.com
+
+groups:
+  test1: # group name
+    tool: kubefwd # a registered tool or an executable on path
+    restart: yes # yes,no,unless-stopped
+    items:
+      - microsservice1,8080,80 # will replace $1, $2 and $3
+      - microsservice2,8081,80
+      - microsservice3,8082,80
+  test2:
+    tool: sshfwd
+    restart: no
+    items:
+      - 8090,80
+      - 8091,80
+      - 8092,80
