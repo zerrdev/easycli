@@ -3,6 +3,7 @@
 import { upCommand } from './commands/up.js';
 import { lsCommand } from './commands/ls.js';
 import { downCommand } from './commands/down.js';
+import { configCommand } from './commands/config.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -16,7 +17,8 @@ async function main(): Promise<void> {
   const [command, ...rest] = args;
   const groupName = rest[0];
 
-  if (!groupName) {
+  // config command doesn't require group name
+  if (command !== 'config' && !groupName) {
     console.error('Error: group name required');
     printUsage();
     process.exit(1);
@@ -26,6 +28,9 @@ async function main(): Promise<void> {
   let exitCode = 0;
 
   switch (command) {
+    case 'config':
+      exitCode = await configCommand();
+      break;
     case 'up':
       exitCode = await upCommand(groupName);
       break;
@@ -46,14 +51,16 @@ async function main(): Promise<void> {
 
 function printUsage(): void {
   console.log(`
-Usage: easycli <command> <group>
+Usage: easycli <command> [group]
 
 Commands:
+  config         Open config file in editor
   up <group>     Start all processes in the group
   ls <group>     List all items in the group
   down <group>   Stop the group (Ctrl+C also works)
 
 Examples:
+  easycli config
   easycli up test1
   easycli ls test1
   easycli down test1
