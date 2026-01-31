@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { EasyCliConfig, GroupConfig, ToolConfig, ProcessItem } from './types.js';
+import type { EasyCliConfig, GroupConfig, ToolConfig } from './types.js';
 
 export class ConfigError extends Error {
   constructor(message: string) {
