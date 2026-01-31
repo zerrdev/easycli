@@ -33,13 +33,12 @@ export class ProcessManager {
   }
 
   private spawnProcess(item: ProcessItem, groupName: string, restartPolicy: GroupConfig['restart']): ChildProcess {
-    // Parse command into executable and args
-    const parts = item.fullCmd.split(' ');
-    const cmd = parts[0];
-    const args = parts.slice(1);
+    // Parse command into executable and args, handling quoted strings
+    const { cmd, args } = this.parseCommand(item.fullCmd);
 
     const proc = spawn(cmd, args, {
-      stdio: ['inherit', 'pipe', 'pipe']
+      stdio: ['inherit', 'pipe', 'pipe'],
+      shell: process.platform === 'win32' // Use shell on Windows for better path handling
     });
 
     // Prefix output with item name
@@ -63,8 +62,43 @@ export class ProcessManager {
     return proc;
   }
 
+  private parseCommand(fullCmd: string): { cmd: string; args: string[] } {
+    // Handle quoted strings for Windows paths with spaces
+    const args: string[] = [];
+    let current = '';
+    let inQuote = false;
+    let quoteChar = '';
+
+    for (let i = 0; i < fullCmd.length; i++) {
+      const char = fullCmd[i];
+      const nextChar = fullCmd[i + 1];
+
+      if ((char === '"' || char === "'") && !inQuote) {
+        inQuote = true;
+        quoteChar = char;
+      } else if (char === quoteChar && inQuote) {
+        inQuote = false;
+        quoteChar = '';
+      } else if (char === ' ' && !inQuote) {
+        if (current) {
+          args.push(current);
+          current = '';
+        }
+      } else {
+        current += char;
+      }
+    }
+
+    if (current) {
+      args.push(current);
+    }
+
+    return { cmd: args[0] || '', args: args.slice(1) };
+  }
+
   private handleExit(groupName: string, item: ProcessItem, restartPolicy: GroupConfig['restart'], code: number | null, signal: NodeJS.Signals | null): void {
     // Check if killed by easycli (don't restart if unless-stopped)
+    // SIGTERM works on both Unix and Windows in Node.js
     if (restartPolicy === 'unless-stopped' && signal === 'SIGTERM') {
       return;
     }
@@ -105,6 +139,8 @@ export class ProcessManager {
     if (!processes) return;
 
     for (const mp of processes) {
+      // SIGTERM works on both Unix and Windows in Node.js
+      // On Windows, it's mapped to a graceful termination
       mp.process.kill('SIGTERM');
     }
 
