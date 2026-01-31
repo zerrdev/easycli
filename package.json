@@ -2,12 +2,15 @@
   "name": "easycli",
   "version": "1.0.0",
   "main": "dist/index.js",
+  "bin": {
+    "easycli": "./dist/index.js"
+  },
   "type": "module",
   "author": "zerr <gabriel@zerr.dev>",
   "license": "MIT",
   "scripts": {
-    "dev": "esbuild src/index.ts --watch --bundle --format=esm --outfile=dist/index.js --sourcemap",
-    "build": "esbuild src/index.ts --bundle --format=esm --outfile=dist/index.js --minify",
+    "dev": "esbuild src/index.ts --watch --bundle --format=esm --platform=node --outfile=dist/index.js --sourcemap",
+    "build": "esbuild src/index.ts --bundle --format=esm --platform=node --outfile=dist/index.js --minify",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
