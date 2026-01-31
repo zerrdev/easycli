@@ -17,6 +17,14 @@ Create a `.easycli.yml` configuration file. EasyCLI looks for the config in:
 
 You can keep a global config in your home directory and override it per project.
 
+Quick start:
+
+```bash
+easycli config  # Opens ~/.easycli.yml in your editor
+```
+
+This creates a config file with examples if it doesn't exist.
+
 Example config:
 
 ```yaml
@@ -33,9 +41,16 @@ groups:
       - service2,8081,80
 ```
 
+**Syntax:**
+- Items are comma-separated: `"name,arg2,arg3"`
+- `$1` = name (first value)
+- `$2`, `$3`... = additional arguments
+- If no `tool` specified, executes directly
+
 ## Usage
 
 ```bash
+easycli config        # Open config file in editor
 easycli up <group>    # Start all processes in group
 easycli ls <group>    # List group items
 easycli down <group>  # Stop group (Ctrl+C also works)
