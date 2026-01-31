@@ -646,5 +646,30 @@ groups:
       assert.ok(output.includes('node'));
       assert.ok(output.includes('1')); // item count for direct
     });
+
+    it('should handle empty groups list', async () => {
+      const configContent = `
+groups: {}
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+      resetOutput();
+
+      const exitCode = await groupsCommand(false);
+
+      assert.strictEqual(exitCode, 0);
+      assert.strictEqual(getLogOutput(), '');
+    });
+
+    it('should handle missing config file', async () => {
+      if (fs.existsSync(testConfigPath)) {
+        fs.unlinkSync(testConfigPath);
+      }
+      resetOutput();
+
+      const exitCode = await groupsCommand(false);
+
+      assert.strictEqual(exitCode, 1);
+      assert.ok(getErrorOutput().includes('Config file not found'));
+    });
   });
 });
