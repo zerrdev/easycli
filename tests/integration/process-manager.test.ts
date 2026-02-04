@@ -23,9 +23,9 @@ describe('ProcessManager Integration Tests', () => {
     manager = new ProcessManager();
   });
 
-  after(() => {
+  after(async () => {
     // Clean up any running processes
-    manager.killAll();
+    await manager.killAll();
   });
 
   describe('spawnGroup()', () => {
@@ -41,7 +41,7 @@ describe('ProcessManager Integration Tests', () => {
       assert.strictEqual(status.length, 1);
 
       // Clean up
-      manager.killGroup('test-group');
+      await manager.killGroup('test-group');
     });
 
     it('should spawn a group with multiple processes', async () => {
@@ -58,7 +58,7 @@ describe('ProcessManager Integration Tests', () => {
       assert.strictEqual(status.length, 3);
 
       // Clean up
-      manager.killGroup('multi-group');
+      await manager.killGroup('multi-group');
     });
 
     it('should throw error when spawning duplicate group', async () => {
@@ -77,7 +77,7 @@ describe('ProcessManager Integration Tests', () => {
       );
 
       // Clean up
-      manager.killGroup('dup-group');
+      await manager.killGroup('dup-group');
     });
 
     it('should handle processes with different exit times', async () => {
@@ -101,7 +101,7 @@ describe('ProcessManager Integration Tests', () => {
       assert.strictEqual(manager.isGroupRunning('timed-group'), true);
 
       // Clean up
-      manager.killGroup('timed-group');
+      await manager.killGroup('timed-group');
     });
   });
 
@@ -118,14 +118,14 @@ describe('ProcessManager Integration Tests', () => {
       manager.spawnGroup('kill-test', items, 'no');
       assert.strictEqual(manager.isGroupRunning('kill-test'), true);
 
-      manager.killGroup('kill-test');
+      await manager.killGroup('kill-test');
 
       assert.strictEqual(manager.isGroupRunning('kill-test'), false);
     });
 
-    it('should handle killing non-existent group gracefully', () => {
+    it('should handle killing non-existent group gracefully', async () => {
       // Should not throw
-      manager.killGroup('non-existent');
+      await manager.killGroup('non-existent');
       assert.strictEqual(manager.isGroupRunning('non-existent'), false);
     });
 
@@ -142,7 +142,7 @@ describe('ProcessManager Integration Tests', () => {
       manager.spawnGroup('multi-kill', items, 'no');
       assert.strictEqual(manager.isGroupRunning('multi-kill'), true);
 
-      manager.killGroup('multi-kill');
+      await manager.killGroup('multi-kill');
 
       assert.strictEqual(manager.isGroupRunning('multi-kill'), false);
     });
@@ -165,16 +165,16 @@ describe('ProcessManager Integration Tests', () => {
       assert.strictEqual(manager.isGroupRunning('group2'), true);
       assert.strictEqual(manager.isGroupRunning('group3'), true);
 
-      manager.killAll();
+      await manager.killAll();
 
       assert.strictEqual(manager.isGroupRunning('group1'), false);
       assert.strictEqual(manager.isGroupRunning('group2'), false);
       assert.strictEqual(manager.isGroupRunning('group3'), false);
     });
 
-    it('should handle empty state gracefully', () => {
+    it('should handle empty state gracefully', async () => {
       // Should not throw when no groups are running
-      manager.killAll();
+      await manager.killAll();
       const running = manager.getRunningGroups();
       assert.strictEqual(running.length, 0);
     });
@@ -192,7 +192,7 @@ describe('ProcessManager Integration Tests', () => {
       assert.strictEqual(status.length, 1);
       assert.strictEqual(status[0], 'running');
 
-      manager.killGroup('status-group');
+      await manager.killGroup('status-group');
     });
 
     it('should return empty array for non-existent group', () => {
@@ -211,7 +211,7 @@ describe('ProcessManager Integration Tests', () => {
 
       assert.strictEqual(manager.isGroupRunning('running-group'), true);
 
-      manager.killGroup('running-group');
+      await manager.killGroup('running-group');
     });
 
     it('should return false for non-existent group', () => {
@@ -226,7 +226,7 @@ describe('ProcessManager Integration Tests', () => {
       manager.spawnGroup('temp-group', items, 'no');
       assert.strictEqual(manager.isGroupRunning('temp-group'), true);
 
-      manager.killGroup('temp-group');
+      await manager.killGroup('temp-group');
       assert.strictEqual(manager.isGroupRunning('temp-group'), false);
     });
   });
@@ -250,11 +250,11 @@ describe('ProcessManager Integration Tests', () => {
       assert.ok(running.includes('list-group-2'));
       assert.ok(running.includes('list-group-3'));
 
-      manager.killAll();
+      await manager.killAll();
     });
 
-    it('should return empty array when no groups running', () => {
-      manager.killAll();
+    it('should return empty array when no groups running', async () => {
+      await manager.killAll();
       const running = manager.getRunningGroups();
       assert.strictEqual(running.length, 0);
     });
@@ -275,7 +275,7 @@ describe('ProcessManager Integration Tests', () => {
       // Group should still be tracked but process won't restart
       assert.strictEqual(manager.isGroupRunning('no-restart-group'), true);
 
-      manager.killGroup('no-restart-group');
+      await manager.killGroup('no-restart-group');
     });
 
     it('should handle unless-stopped restart policy', async () => {
@@ -291,7 +291,7 @@ describe('ProcessManager Integration Tests', () => {
       assert.strictEqual(manager.isGroupRunning('unless-stopped-group'), true);
 
       // Kill with SIGTERM
-      manager.killGroup('unless-stopped-group');
+      await manager.killGroup('unless-stopped-group');
 
       // Process should not restart after SIGTERM
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -300,7 +300,7 @@ describe('ProcessManager Integration Tests', () => {
   });
 
   describe('parseCommand()', () => {
-    it('should parse simple command', () => {
+    it('should parse simple command', async () => {
       const items: ProcessItem[] = [
         { name: 'parse-test', args: [], fullCmd: 'echo hello' }
       ];
@@ -310,10 +310,10 @@ describe('ProcessManager Integration Tests', () => {
       // Command should execute successfully
       assert.strictEqual(manager.isGroupRunning('parse-test-group'), true);
 
-      manager.killGroup('parse-test-group');
+      await manager.killGroup('parse-test-group');
     });
 
-    it('should parse command with multiple arguments', () => {
+    it('should parse command with multiple arguments', async () => {
       const items: ProcessItem[] = [
         { name: 'multi-arg', args: [], fullCmd: 'node -e "console.log(\'test\')"' }
       ];
@@ -322,10 +322,10 @@ describe('ProcessManager Integration Tests', () => {
 
       assert.strictEqual(manager.isGroupRunning('multi-arg-group'), true);
 
-      manager.killGroup('multi-arg-group');
+      await manager.killGroup('multi-arg-group');
     });
 
-    it('should handle quoted paths with spaces', () => {
+    it('should handle quoted paths with spaces', async () => {
       const items: ProcessItem[] = [
         { name: 'quoted-path', args: [], fullCmd: '"echo" "hello world"' }
       ];
@@ -334,7 +334,7 @@ describe('ProcessManager Integration Tests', () => {
 
       assert.strictEqual(manager.isGroupRunning('quoted-path-group'), true);
 
-      manager.killGroup('quoted-path-group');
+      await manager.killGroup('quoted-path-group');
     });
   });
 
@@ -351,7 +351,7 @@ describe('ProcessManager Integration Tests', () => {
 
       assert.strictEqual(manager.isGroupRunning('output-test'), true);
 
-      manager.killGroup('output-test');
+      await manager.killGroup('output-test');
     });
   });
 
@@ -369,7 +369,7 @@ describe('ProcessManager Integration Tests', () => {
 
       assert.strictEqual(manager.isGroupRunning('win-test'), true);
 
-      manager.killGroup('win-test');
+      await manager.killGroup('win-test');
     });
 
     it('should work with Unix-specific commands', async function skipOnWindows() {
@@ -385,7 +385,7 @@ describe('ProcessManager Integration Tests', () => {
 
       assert.strictEqual(manager.isGroupRunning('unix-test'), true);
 
-      manager.killGroup('unix-test');
+      await manager.killGroup('unix-test');
     });
   });
 });

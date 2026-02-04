@@ -139,23 +139,47 @@ export class ProcessManager {
     }, 1000);
   }
 
-  killGroup(groupName: string): void {
+  killGroup(groupName: string): Promise<void> {
     const processes = this.groups.get(groupName);
-    if (!processes) return;
+    if (!processes) return Promise.resolve();
 
-    for (const mp of processes) {
-      // SIGTERM works on both Unix and Windows in Node.js
-      // On Windows, it's mapped to a graceful termination
-      mp.process.kill('SIGTERM');
-    }
+    const killPromises = processes.map(mp => this.killProcess(mp.process));
 
     this.groups.delete(groupName);
+    return Promise.all(killPromises).then(() => {});
   }
 
-  killAll(): void {
+  private killProcess(proc: ChildProcess): Promise<void> {
+    return new Promise((resolve) => {
+      // First try SIGTERM for graceful shutdown
+      proc.kill('SIGTERM');
+
+      // Force kill with SIGKILL after 5 seconds if still running
+      const timeout = setTimeout(() => {
+        if (!proc.killed) {
+          proc.kill('SIGKILL');
+        }
+      }, 5000);
+
+      proc.on('exit', () => {
+        clearTimeout(timeout);
+        resolve();
+      });
+
+      // If already dead, resolve immediately
+      if (proc.killed || proc.exitCode !== null) {
+        clearTimeout(timeout);
+        resolve();
+      }
+    });
+  }
+
+  killAll(): Promise<void> {
+    const killPromises: Promise<void>[] = [];
     for (const groupName of this.groups.keys()) {
-      this.killGroup(groupName);
+      killPromises.push(this.killGroup(groupName));
     }
+    return Promise.all(killPromises).then(() => {});
   }
 
   getGroupStatus(groupName: string): ProcessStatus[] {

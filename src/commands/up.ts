@@ -22,11 +22,11 @@ export async function upCommand(groupName: string): Promise<number> {
 
   // Wait for signals
   return new Promise((resolve) => {
-    const cleanup = () => {
+    const cleanup = async () => {
       console.log('\nShutting down...');
-      manager.killAll();
       process.removeListener('SIGINT', cleanup);
       process.removeListener('SIGTERM', cleanup);
+      await manager.killAll();
       resolve(0);
     };
 
