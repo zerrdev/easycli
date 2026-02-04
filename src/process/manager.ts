@@ -13,7 +13,7 @@ export class ManagedProcess {
 
 export class ProcessManager {
   private groups = new Map<string, ManagedProcess[]>();
-  private restartCount = new Map<string, number>();
+  private restartTimestamps = new Map<string, number[]>();
   private readonly maxRestarts = 3;
   private readonly restartWindow = 10000; // 10 seconds
 
@@ -108,12 +108,17 @@ export class ProcessManager {
       return;
     }
 
-    // Check for crash loop
+    // Check for crash loop (within the restart window)
     const key = `${groupName}-${item.name}`;
-    const count = (this.restartCount.get(key) || 0) + 1;
-    this.restartCount.set(key, count);
+    const now = Date.now();
+    const timestamps = this.restartTimestamps.get(key) || [];
 
-    if (count > this.maxRestarts) {
+    // Filter out timestamps outside the restart window
+    const recentTimestamps = timestamps.filter(ts => now - ts < this.restartWindow);
+    recentTimestamps.push(now);
+    this.restartTimestamps.set(key, recentTimestamps);
+
+    if (recentTimestamps.length > this.maxRestarts) {
       console.error(`[${item.name}] Crash loop detected. Stopping restarts.`);
       return;
     }
