@@ -28,7 +28,7 @@ export async function groupsCommand(verbose: boolean): Promise<number> {
         details.push({
           name,
           tool: group.tool || '(none)',
-          restart: group.restart,
+          restart: group.restart || '(none)',
           itemCount: group.items.length,
         });
       }
