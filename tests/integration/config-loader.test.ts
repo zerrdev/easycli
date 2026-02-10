@@ -22,8 +22,8 @@ describe('ConfigLoader Integration Tests', () => {
 
   before(() => {
     // Create a temporary directory for test configs
-    testConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'easycli-test-'));
-    testConfigPath = path.join(testConfigDir, '.easycli.yml');
+    testConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cligr-test-'));
+    testConfigPath = path.join(testConfigDir, '.cligr.yml');
 
     // Mock os.homedir to return our test directory
     originalHomeDir = os.homedir();
@@ -313,8 +313,8 @@ groups:
 
   describe('Config precedence', () => {
     it('should prefer home directory config over current directory', () => {
-      const homeConfigPath = path.join(testConfigDir, '.easycli.yml');
-      const currentConfigPath = path.join(process.cwd(), '.easycli.yml');
+      const homeConfigPath = path.join(testConfigDir, '.cligr.yml');
+      const currentConfigPath = path.join(process.cwd(), '.cligr.yml');
 
       const homeContent = `
 groups:

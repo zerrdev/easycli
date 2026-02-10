@@ -3,8 +3,8 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 
-const CONFIG_FILENAME = '.easycli.yml';
-const TEMPLATE = `# EasyCLI Configuration
+const CONFIG_FILENAME = '.cligr.yml';
+const TEMPLATE = `# Cligr Configuration
 
 groups:
   web:
@@ -66,7 +66,7 @@ function spawnEditor(filePath: string, editorCmd: string): void {
       `Install VS Code or set EDITOR environment variable.\n\n` +
       `Example:\n` +
       `  export EDITOR=vim\n` +
-      `  easycli config`
+      `  cligr config`
     );
   }
 

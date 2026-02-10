@@ -1,26 +1,26 @@
-# EasyCLI
+# Cligr
 
 A simple CLI tool for managing groups of concurrent processes.
 
 ## Installation
 
 ```bash
-npm install -g easycli
+npm install -g Cligri
 ```
 
 ## Configuration
 
-Create a `.easycli.yml` configuration file. EasyCLI looks for the config in:
+Create a `.cligr.yml` configuration file. Cligr looks for the config in:
 
-1. **User home directory** (`~/.easycli.yml`) - checked first
-2. **Current directory** (`./.easycli.yml`) - fallback
+1. **User home directory** (`~/.cligr.yml`) - checked first
+2. **Current directory** (`./.cligr.yml`) - fallback
 
 You can keep a global config in your home directory and override it per project.
 
 Quick start:
 
 ```bash
-easycli config  # Opens ~/.easycli.yml in your editor
+cligr config  # Opens ~/.cligr.yml in your editor
 ```
 
 This creates a config file with examples if it doesn't exist.
@@ -50,16 +50,16 @@ groups:
 ## Usage
 
 ```bash
-easycli config              # Open config file in editor
-easycli up <group>          # Start all processes in group
-easycli ls <group>          # List group items
-easycli down <group>        # Stop group (Ctrl+C also works)
-easycli groups              # List all groups
-easycli groups -v           # List groups with details
+cligr config              # Open config file in editor
+cligr up <group>          # Start all processes in group
+cligr ls <group>          # List group items
+cligr down <group>        # Stop group (Ctrl+C also works)
+cligr groups              # List all groups
+cligr groups -v           # List groups with details
 ```
 
 ## Restart Policies
 
 - `yes` - Always restart on exit
 - `no` - Never restart
-- `unless-stopped` - Restart unless killed by easycli
+- `unless-stopped` - Restart unless killed by cligr

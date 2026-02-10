@@ -8,7 +8,7 @@ export interface GroupConfig {
   items: string[];
 }
 
-export interface EasyCliConfig {
+export interface CliGrConfig {
   tools?: Record<string, ToolConfig>;
   groups: Record<string, GroupConfig>;
 }

@@ -97,7 +97,7 @@ export class ProcessManager {
   }
 
   private handleExit(groupName: string, item: ProcessItem, restartPolicy: GroupConfig['restart'], code: number | null, signal: NodeJS.Signals | null): void {
-    // Check if killed by easycli (don't restart if unless-stopped)
+    // Check if killed by cligr (don't restart if unless-stopped)
     // SIGTERM works on both Unix and Windows in Node.js
     if (restartPolicy === 'unless-stopped' && signal === 'SIGTERM') {
       return;

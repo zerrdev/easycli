@@ -2,9 +2,9 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { EasyCliConfig, GroupConfig, ToolConfig } from './types.js';
+import type { CliGrConfig, GroupConfig, ToolConfig } from './types.js';
 
-const CONFIG_FILENAME = '.easycli.yml';
+const CONFIG_FILENAME = '.cligr.yml';
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -36,7 +36,7 @@ export class ConfigLoader {
     }
   }
 
-  load(): EasyCliConfig {
+  load(): CliGrConfig {
     if (!fs.existsSync(this.configPath)) {
       throw new ConfigError(
         `Config file not found. Looking for:\n` +
@@ -57,7 +57,7 @@ export class ConfigLoader {
     return this.validate(config);
   }
 
-  private validate(config: unknown): EasyCliConfig {
+  private validate(config: unknown): CliGrConfig {
     if (!config || typeof config !== 'object') {
       throw new ConfigError('Config must be an object');
     }
@@ -68,7 +68,7 @@ export class ConfigLoader {
       throw new ConfigError('Config must have a "groups" object');
     }
 
-    return cfg as EasyCliConfig;
+    return cfg as CliGrConfig;
   }
 
   getGroup(name: string): { config: GroupConfig; tool: string | null; toolTemplate: string | null } {

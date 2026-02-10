@@ -1,12 +1,12 @@
 {
-  "name": "easycli",
+  "name": "cligr",
   "version": "1.0.0",
   "main": "dist/index.js",
   "bin": {
-    "easycli": "./dist/index.js"
+    "cligr": "./dist/index.js"
   },
   "type": "module",
-  "author": "zerr <gabriel@zerr.dev>",
+  "author": "zerr",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build.js",

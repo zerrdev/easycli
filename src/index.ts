@@ -68,7 +68,7 @@ async function main(): Promise<void> {
 
 function printUsage(): void {
   console.log(`
-Usage: easycli <command> [options] [group]
+Usage: cligr <command> [options] [group]
 
 Commands:
   config              Open config file in editor
@@ -81,12 +81,12 @@ Options:
   -v, --verbose       Show detailed group information
 
 Examples:
-  easycli config
-  easycli up test1
-  easycli ls test1
-  easycli down test1
-  easycli groups
-  easycli groups -v
+  cligr config
+  cligr up test1
+  cligr ls test1
+  cligr down test1
+  cligr groups
+  cligr groups -v
 `);
 }
 

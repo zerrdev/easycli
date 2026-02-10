@@ -19,7 +19,7 @@ describe('Blocking Processes Integration Tests', () => {
 
   before(() => {
     manager = new ProcessManager();
-    testScriptsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'easycli-blocking-test-'));
+    testScriptsDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cligr-blocking-test-'));
   });
 
   after(() => {
