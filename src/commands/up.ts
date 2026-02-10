@@ -6,31 +6,39 @@ export async function upCommand(groupName: string): Promise<number> {
   const loader = new ConfigLoader();
   const manager = new ProcessManager();
 
-  // Load group config
-  const { config, tool, toolTemplate } = loader.getGroup(groupName);
+  try {
+    // Load group config
+    const { config, tool, toolTemplate } = loader.getGroup(groupName);
 
-  // Build process items
-  const items = config.items.map((itemStr, index) =>
-    TemplateExpander.parseItem(tool, toolTemplate, itemStr, index)
-  );
+    // Build process items
+    const items = config.items.map((itemStr, index) =>
+      TemplateExpander.parseItem(tool, toolTemplate, itemStr, index)
+    );
 
-  // Spawn all processes
-  manager.spawnGroup(groupName, items, config.restart);
+    // Spawn all processes
+    manager.spawnGroup(groupName, items, config.restart);
 
-  console.log(`Started group ${groupName} with ${items.length} process(es)`);
-  console.log('Press Ctrl+C to stop...');
+    console.log(`Started group ${groupName} with ${items.length} process(es)`);
+    console.log('Press Ctrl+C to stop...');
 
-  // Wait for signals
-  return new Promise((resolve) => {
-    const cleanup = async () => {
-      console.log('\nShutting down...');
-      process.removeListener('SIGINT', cleanup);
-      process.removeListener('SIGTERM', cleanup);
-      await manager.killAll();
-      resolve(0);
-    };
+    // Wait for signals
+    return new Promise((resolve) => {
+      const cleanup = async () => {
+        console.log('\nShutting down...');
+        process.removeListener('SIGINT', cleanup);
+        process.removeListener('SIGTERM', cleanup);
+        await manager.killAll();
+        resolve(0);
+      };
 
-    process.on('SIGINT', cleanup);
-    process.on('SIGTERM', cleanup);
-  });
+      process.on('SIGINT', cleanup);
+      process.on('SIGTERM', cleanup);
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConfigError') {
+      console.error(error.message);
+      return 1;
+    }
+    throw error;
+  }
 }

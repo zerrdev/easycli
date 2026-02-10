@@ -29,8 +29,8 @@ describe('CLI Commands Integration Tests', () => {
 
   before(() => {
     // Create a temporary directory for test configs
-    testConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'easycli-cli-test-'));
-    testConfigPath = path.join(testConfigDir, '.easycli.yml');
+    testConfigDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cligr-cli-test-'));
+    testConfigPath = path.join(testConfigDir, '.cligr.yml');
 
     // Mock os.homedir to return our test directory
     originalHomeDir = os.homedir();
@@ -218,10 +218,9 @@ groups:
 
       assert.strictEqual(exitCode, 0);
       const output = getLogOutput();
-      assert.ok(output.includes('item1'));
-      assert.ok(output.includes('arg1, arg2'));
-      assert.ok(output.includes('item2'));
-      assert.ok(output.includes('arg3, arg4, arg5'));
+      // Items are shown as full strings
+      assert.ok(output.includes('item1,arg1,arg2'));
+      assert.ok(output.includes('item2,arg3,arg4,arg5'));
     });
 
     it('should handle empty items list', async () => {

@@ -12,9 +12,8 @@ export async function lsCommand(groupName: string): Promise<number> {
     console.log('\nItems:');
 
     for (const item of config.items) {
-      const parts = item.split(',');
-      const name = parts[0];
-      console.log(`  - ${name} (args: ${parts.slice(1).join(', ')})`);
+      // Show the full item string as-is in the output
+      console.log(`  - ${item}`);
     }
 
     console.log('');
