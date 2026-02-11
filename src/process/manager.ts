@@ -184,35 +184,6 @@ export class ProcessManager {
     });
   }
 
-  /**
-   * Kill processes for a group by reading from PID store.
-   * This is used by the 'down' command to stop processes that were
-   * started by a previous cligr instance.
-   */
-  async killGroupByPid(groupName: string): Promise<{ killed: number; notRunning: number; errors: string[] }> {
-    const entries = await this.pidStore.readPidsByGroup(groupName);
-    const result = { killed: 0, notRunning: 0, errors: [] as string[] };
-
-    for (const entry of entries) {
-      // Check if PID entry is valid (running and recent)
-      // This prevents killing wrong processes if PID was reused by OS
-      if (this.pidStore.isPidEntryValid(entry)) {
-        try {
-          await this.killPid(entry.pid);
-          result.killed++;
-        } catch (err) {
-          result.errors.push(`[${entry.itemName}] ${err}`);
-        }
-      } else {
-        result.notRunning++;
-      }
-      // Clean up PID file regardless of whether process was running
-      await this.pidStore.deletePid(entry.groupName, entry.itemName);
-    }
-
-    return result;
-  }
-
   private killPid(pid: number): Promise<void> {
     return new Promise((resolve, reject) => {
       try {

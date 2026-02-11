@@ -4,7 +4,6 @@
  * These tests verify the CLI command functionality including:
  * - up command (starting process groups)
  * - ls command (listing groups)
- * - down command (stopping groups)
  * - Error handling
  */
 
@@ -15,7 +14,6 @@ import path from 'node:path';
 import os from 'node:os';
 import { upCommand } from '../../src/commands/up.js';
 import { lsCommand } from '../../src/commands/ls.js';
-import { downCommand } from '../../src/commands/down.js';
 import { groupsCommand } from '../../src/commands/groups.js';
 
 describe('CLI Commands Integration Tests', () => {
@@ -293,30 +291,6 @@ groups:
       assert.strictEqual(exitCode, 0);
       const output = getLogOutput();
       assert.ok(output.includes('Tool: node'));
-    });
-  });
-
-  describe('downCommand', () => {
-    it('should return success and display message when group is not running', async () => {
-      resetOutput();
-
-      const exitCode = await downCommand('test-group');
-
-      assert.strictEqual(exitCode, 0);
-      const output = getLogOutput();
-      assert.ok(output.includes('test-group'));
-      assert.ok(output.includes('not running'));
-    });
-
-    it('should work with any group name', async () => {
-      const groupNames = ['test1', 'my-app', 'production', 'staging-env'];
-
-      for (const groupName of groupNames) {
-        resetOutput();
-        const exitCode = await downCommand(groupName);
-        assert.strictEqual(exitCode, 0);
-        assert.ok(getLogOutput().includes(groupName));
-      }
     });
   });
 

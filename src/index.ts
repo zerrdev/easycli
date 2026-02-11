@@ -2,7 +2,6 @@
 
 import { upCommand } from './commands/up.js';
 import { lsCommand } from './commands/ls.js';
-import { downCommand } from './commands/down.js';
 import { configCommand } from './commands/config.js';
 import { groupsCommand } from './commands/groups.js';
 
@@ -51,9 +50,6 @@ async function main(): Promise<void> {
     case 'ls':
       exitCode = await lsCommand(groupName);
       break;
-    case 'down':
-      exitCode = await downCommand(groupName);
-      break;
     case 'groups':
       exitCode = await groupsCommand(verbose);
       break;
@@ -74,7 +70,6 @@ Commands:
   config              Open config file in editor
   up <group>          Start all processes in the group
   ls <group>          List all items in the group
-  down <group>        Stop the group (Ctrl+C also works)
   groups [-v|--verbose]  List all groups
 
 Options:
@@ -84,7 +79,6 @@ Examples:
   cligr config
   cligr up test1
   cligr ls test1
-  cligr down test1
   cligr groups
   cligr groups -v
 `);
