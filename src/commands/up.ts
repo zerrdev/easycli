@@ -1,12 +1,17 @@
 import { ConfigLoader } from '../config/loader.js';
 import { TemplateExpander } from '../process/template.js';
 import { ProcessManager } from '../process/manager.js';
+import { PidStore } from '../process/pid-store.js';
 
 export async function upCommand(groupName: string): Promise<number> {
   const loader = new ConfigLoader();
   const manager = new ProcessManager();
+  const pidStore = new PidStore();
 
   try {
+    // Clean up any stale PID files for this group on startup
+    await pidStore.cleanupStalePids();
+
     // Load group config
     const { config, tool, toolTemplate } = loader.getGroup(groupName);
 

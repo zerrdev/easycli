@@ -21,6 +21,7 @@
     "typescript": "^5.7.3"
   },
   "dependencies": {
+    "-": "^0.0.1",
     "js-yaml": "^4.1.1"
   }
 }

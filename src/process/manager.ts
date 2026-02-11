@@ -1,5 +1,6 @@
 import { spawn, ChildProcess } from 'child_process';
 import type { GroupConfig, ProcessItem } from '../config/types.js';
+import { PidStore, type PidEntry } from './pid-store.js';
 
 export type ProcessStatus = 'running' | 'stopped' | 'failed';
 
@@ -16,6 +17,7 @@ export class ProcessManager {
   private restartTimestamps = new Map<string, number[]>();
   private readonly maxRestarts = 3;
   private readonly restartWindow = 10000; // 10 seconds
+  private readonly pidStore = new PidStore();
 
   spawnGroup(groupName: string, items: ProcessItem[], restartPolicy: GroupConfig['restart']): void {
     if (this.groups.has(groupName)) {
@@ -38,8 +40,31 @@ export class ProcessManager {
 
     const proc = spawn(cmd, args, {
       stdio: ['inherit', 'pipe', 'pipe'],
-      shell: process.platform === 'win32' // Use shell on Windows for better path handling
+      // On Windows, don't use shell to avoid PID mismatch
+      // The shell's PID would be stored instead of the actual process
+      // For commands that need shell, user should use cmd /c prefix
+      shell: false,
+      windowsHide: true // Hide console window on Windows
     });
+
+    // Write PID file when process is spawned
+    // First, clean up any stale PID file for this process
+    // This prevents issues with leftover PIDs from previous crashes
+    this.pidStore.deletePid(groupName, item.name).catch(() => {});
+
+    if (proc.pid) {
+      const pidEntry: PidEntry = {
+        pid: proc.pid,
+        groupName,
+        itemName: item.name,
+        startTime: Date.now(),
+        restartPolicy,
+        fullCmd: item.fullCmd
+      };
+      this.pidStore.writePid(pidEntry).catch(err => {
+        console.error(`[${item.name}] Failed to write PID file:`, err);
+      });
+    }
 
     // Prefix output with item name
     if (proc.stdout) {
@@ -100,11 +125,15 @@ export class ProcessManager {
     // Check if killed by cligr (don't restart if unless-stopped)
     // SIGTERM works on both Unix and Windows in Node.js
     if (restartPolicy === 'unless-stopped' && signal === 'SIGTERM') {
+      // Clean up PID file when killed by cligr
+      this.pidStore.deletePid(groupName, item.name).catch(() => {});
       return;
     }
 
     // Check restart policy
     if (restartPolicy === 'no') {
+      // Clean up PID file when not restarting
+      this.pidStore.deletePid(groupName, item.name).catch(() => {});
       return;
     }
 
@@ -120,6 +149,8 @@ export class ProcessManager {
 
     if (recentTimestamps.length > this.maxRestarts) {
       console.error(`[${item.name}] Crash loop detected. Stopping restarts.`);
+      // Clean up PID file when stopping due to crash loop
+      this.pidStore.deletePid(groupName, item.name).catch(() => {});
       return;
     }
 
@@ -146,7 +177,76 @@ export class ProcessManager {
     const killPromises = processes.map(mp => this.killProcess(mp.process));
 
     this.groups.delete(groupName);
-    return Promise.all(killPromises).then(() => {});
+
+    // Clean up PID files after killing
+    return Promise.all(killPromises).then(async () => {
+      await this.pidStore.deleteGroupPids(groupName);
+    });
+  }
+
+  /**
+   * Kill processes for a group by reading from PID store.
+   * This is used by the 'down' command to stop processes that were
+   * started by a previous cligr instance.
+   */
+  async killGroupByPid(groupName: string): Promise<{ killed: number; notRunning: number; errors: string[] }> {
+    const entries = await this.pidStore.readPidsByGroup(groupName);
+    const result = { killed: 0, notRunning: 0, errors: [] as string[] };
+
+    for (const entry of entries) {
+      // Check if PID entry is valid (running and recent)
+      // This prevents killing wrong processes if PID was reused by OS
+      if (this.pidStore.isPidEntryValid(entry)) {
+        try {
+          await this.killPid(entry.pid);
+          result.killed++;
+        } catch (err) {
+          result.errors.push(`[${entry.itemName}] ${err}`);
+        }
+      } else {
+        result.notRunning++;
+      }
+      // Clean up PID file regardless of whether process was running
+      await this.pidStore.deletePid(entry.groupName, entry.itemName);
+    }
+
+    return result;
+  }
+
+  private killPid(pid: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        // First try SIGTERM for graceful shutdown
+        process.kill(pid, 'SIGTERM');
+
+        // Force kill with SIGKILL after 5 seconds if still running
+        const timeout = setTimeout(() => {
+          try {
+            process.kill(pid, 'SIGKILL');
+          } catch {
+            // Process might have already exited
+          }
+        }, 5000);
+
+        // Poll for process exit
+        const checkInterval = setInterval(() => {
+          if (!this.pidStore.isPidRunning(pid)) {
+            clearTimeout(timeout);
+            clearInterval(checkInterval);
+            resolve();
+          }
+        }, 100);
+
+        // If already dead, resolve quickly
+        if (!this.pidStore.isPidRunning(pid)) {
+          clearTimeout(timeout);
+          clearInterval(checkInterval);
+          resolve();
+        }
+      } catch (err) {
+        reject(err);
+      }
+    });
   }
 
   private killProcess(proc: ChildProcess): Promise<void> {

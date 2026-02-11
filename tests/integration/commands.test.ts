@@ -297,15 +297,15 @@ groups:
   });
 
   describe('downCommand', () => {
-    it('should return success and display message', async () => {
+    it('should return success and display message when group is not running', async () => {
       resetOutput();
 
       const exitCode = await downCommand('test-group');
 
       assert.strictEqual(exitCode, 0);
       const output = getLogOutput();
-      assert.ok(output.includes('down test-group'));
-      assert.ok(output.includes('will stop'));
+      assert.ok(output.includes('test-group'));
+      assert.ok(output.includes('not running'));
     });
 
     it('should work with any group name', async () => {
