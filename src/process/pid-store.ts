@@ -33,10 +33,21 @@ export class PidStore {
   }
 
   /**
+   * Sanitize item name for use in file path
+   * Replaces characters invalid on Windows (like colons in paths)
+   */
+  private sanitizeItemName(itemName: string): string {
+    // Replace characters that are invalid in Windows filenames
+    // < > : " / \ | ? *
+    return itemName.replace(/[<>:"/\\|?*]/g, '_');
+  }
+
+  /**
    * Get the PID file path for a specific group and item
    */
   private getPidFilePath(groupName: string, itemName: string): string {
-    return path.join(this.pidsDir, `${groupName}_${itemName}.pid`);
+    const sanitizedName = this.sanitizeItemName(itemName);
+    return path.join(this.pidsDir, `${groupName}_${sanitizedName}.pid`);
   }
 
   /**
