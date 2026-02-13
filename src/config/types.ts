@@ -4,7 +4,8 @@ export interface ToolConfig {
 
 export interface GroupConfig {
   tool: string;
-  restart: 'yes' | 'no' | 'unless-stopped';
+  restart?: 'yes' | 'no' | 'unless-stopped';
+  params?: Record<string, string>;
   items: string[];
 }
 
