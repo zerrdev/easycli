@@ -13,11 +13,11 @@ export async function upCommand(groupName: string): Promise<number> {
     await pidStore.cleanupStalePids();
 
     // Load group config
-    const { config, tool, toolTemplate } = loader.getGroup(groupName);
+    const { config, tool, toolTemplate, params } = loader.getGroup(groupName);
 
     // Build process items
     const items = config.items.map((itemStr, index) =>
-      TemplateExpander.parseItem(tool, toolTemplate, itemStr, index)
+      TemplateExpander.parseItem(tool, toolTemplate, itemStr, index, params)
     );
 
     // Spawn all processes
