@@ -359,4 +359,88 @@ describe('TemplateExpander Integration Tests', () => {
       }
     });
   });
+
+  describe('Named params', () => {
+    it('should replace named param in template', () => {
+      const template = 'node $1.js --name $name';
+      const itemStr = 'server';
+      const params = { name: 'John doe' };
+
+      const result = TemplateExpander.expand(template, itemStr, 0, params);
+
+      assert.strictEqual(result.name, 'server');
+      assert.strictEqual(result.fullCmd, 'node server.js --name John doe');
+    });
+
+    it('should replace multiple named params', () => {
+      const template = 'app --host $host --port $port --env $env';
+      const itemStr = 'myapp';
+      const params = { host: 'localhost', port: '3000', env: 'production' };
+
+      const result = TemplateExpander.expand(template, itemStr, 0, params);
+
+      assert.strictEqual(result.fullCmd, 'app --host localhost --port 3000 --env production');
+    });
+
+    it('should combine positional and named params', () => {
+      const template = 'node $1.js --name $name --port $port';
+      const itemStr = 'server';
+      const params = { name: 'Alice', port: '8080' };
+
+      const result = TemplateExpander.expand(template, itemStr, 0, params);
+
+      assert.strictEqual(result.fullCmd, 'node server.js --name Alice --port 8080');
+    });
+
+    it('should handle empty params object', () => {
+      const template = 'node $1.js';
+      const itemStr = 'server';
+
+      const result = TemplateExpander.expand(template, itemStr, 0, {});
+
+      assert.strictEqual(result.fullCmd, 'node server.js');
+    });
+
+    it('should leave unreplaced named params as-is', () => {
+      const template = 'node $1.js --name $name --env $env';
+      const itemStr = 'server';
+      const params = { name: 'Bob' }; // env not provided
+
+      const result = TemplateExpander.expand(template, itemStr, 0, params);
+
+      assert.strictEqual(result.fullCmd, 'node server.js --name Bob --env $env');
+    });
+
+    it('should replace all occurrences of named param', () => {
+      const template = 'echo $name and $name again';
+      const itemStr = 'test';
+      const params = { name: 'world' };
+
+      const result = TemplateExpander.expand(template, itemStr, 0, params);
+
+      assert.strictEqual(result.fullCmd, 'echo world and world again');
+    });
+
+    it('should work with parseItem for registered tools', () => {
+      const tool = 'node-param';
+      const toolTemplate = 'node $1.js --name $name';
+      const itemStr = 'server';
+      const params = { name: 'Charlie' };
+
+      const result = TemplateExpander.parseItem(tool, toolTemplate, itemStr, 0, params);
+
+      assert.strictEqual(result.name, 'server');
+      assert.strictEqual(result.fullCmd, 'node server.js --name Charlie');
+    });
+
+    it('should handle named params with spaces in values', () => {
+      const template = 'echo "Hello, $name!"';
+      const itemStr = 'test';
+      const params = { name: 'John Doe' };
+
+      const result = TemplateExpander.expand(template, itemStr, 0, params);
+
+      assert.strictEqual(result.fullCmd, 'echo "Hello, John Doe!"');
+    });
+  });
 });
