@@ -68,7 +68,7 @@ export class ConfigLoader {
       throw new ConfigError('Config must have a "groups" object');
     }
 
-    return cfg as CliGrConfig;
+    return cfg as unknown as CliGrConfig;
   }
 
   getGroup(name: string): { config: GroupConfig; tool: string | null; toolTemplate: string | null; params: Record<string, string> } {
