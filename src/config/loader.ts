@@ -71,7 +71,7 @@ export class ConfigLoader {
     return cfg as CliGrConfig;
   }
 
-  getGroup(name: string): { config: GroupConfig; tool: string | null; toolTemplate: string | null } {
+  getGroup(name: string): { config: GroupConfig; tool: string | null; toolTemplate: string | null; params: Record<string, string> } {
     const config = this.load();
     const group = config.groups[name];
 
@@ -93,7 +93,10 @@ export class ConfigLoader {
       toolTemplate = null;
     }
 
-    return { config: group, tool, toolTemplate };
+    // Extract params (default to empty object)
+    const params = group.params || {};
+
+    return { config: group, tool, toolTemplate, params };
   }
 
   listGroups(): string[] {
