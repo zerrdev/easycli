@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { CliGrConfig, GroupConfig, ToolConfig } from './types.js';
+import type { CliGrConfig, GroupConfig, ToolConfig, ItemEntry } from './types.js';
 
 const CONFIG_FILENAME = '.cligr.yml';
 
@@ -68,7 +68,41 @@ export class ConfigLoader {
       throw new ConfigError('Config must have a "groups" object');
     }
 
+    // Validate each group's items
+    for (const [groupName, group] of Object.entries(cfg.groups as Record<string, unknown>)) {
+      if (group && typeof group === 'object') {
+        const groupObj = group as Record<string, unknown>;
+        this.validateItems(groupObj.items, groupName);
+      }
+    }
+
     return cfg as unknown as CliGrConfig;
+  }
+
+  private validateItems(items: unknown, groupName: string): void {
+    if (!items || typeof items !== 'object' || Array.isArray(items)) {
+      throw new ConfigError(
+        `Group "${groupName}": items must be an object with named entries, e.g.:\n` +
+        '  items:\n' +
+        '    serviceName: "value1,value2"'
+      );
+    }
+
+    const seenNames = new Set<string>();
+
+    for (const [name, value] of Object.entries(items as Record<string, unknown>)) {
+      if (typeof value !== 'string') {
+        throw new ConfigError(`Group "${groupName}": item "${name}" must have a string value`);
+      }
+
+      if (seenNames.has(name)) {
+        throw new ConfigError(
+          `Group "${groupName}": duplicate item name "${name}". ` +
+          `Item names must be unique within a group.`
+        );
+      }
+      seenNames.add(name);
+    }
   }
 
   getGroup(name: string): { config: GroupConfig; tool: string | null; toolTemplate: string | null; params: Record<string, string> } {
