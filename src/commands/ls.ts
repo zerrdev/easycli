@@ -4,16 +4,15 @@ export async function lsCommand(groupName: string): Promise<number> {
   const loader = new ConfigLoader();
 
   try {
-    const { config } = loader.getGroup(groupName);
+    const { config, items } = loader.getGroup(groupName);
 
     console.log(`\nGroup: ${groupName}`);
     console.log(`Tool: ${config.tool}`);
     console.log(`Restart: ${config.restart}`);
     console.log('\nItems:');
 
-    for (const item of config.items) {
-      // Show the full item string as-is in the output
-      console.log(`  - ${item}`);
+    for (const item of items) {
+      console.log(`  ${item.name}: ${item.value}`);
     }
 
     console.log('');
