@@ -29,7 +29,7 @@ export async function groupsCommand(verbose: boolean): Promise<number> {
           name,
           tool: group.tool || '(none)',
           restart: group.restart || '(none)',
-          itemCount: group.items.length,
+          itemCount: Object.keys(group.items).length,
         });
       }
 
