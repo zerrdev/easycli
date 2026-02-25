@@ -6,13 +6,10 @@
  */
 
 import { build } from 'esbuild';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-const execAsync = promisify(exec);
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -99,22 +96,29 @@ async function buildTests(skipBlocking = false) {
   return testFiles.length;
 }
 
-async function runTests(verbose = false) {
+function runTests(verbose = false) {
   const testFiles = fs.readdirSync(path.join(DIST_DIR, 'integration'))
     .filter(f => f.endsWith('.test.js'))
-    .map(f => path.join(DIST_DIR, 'integration', f))
-    .join(' ');
+    .map(f => path.join(DIST_DIR, 'integration', f));
 
-  const verboseFlag = verbose ? '--verbose' : '';
-  const command = `node --test ${verboseFlag} ${testFiles}`;
+  const args = ['--test'];
+  if (verbose) {
+    args.push('--verbose');
+  }
+  args.push(...testFiles);
 
   console.log('\nRunning tests...\n');
-  const { stdout, stderr } = await execAsync(command, {
+  const result = spawnSync('node', args, {
     stdio: 'inherit',
-    cwd: PROJECT_ROOT
+    cwd: PROJECT_ROOT,
+    shell: true
   });
 
-  return { stdout, stderr };
+  if (result.status !== 0) {
+    throw new Error(`Tests failed with exit code ${result.status}`);
+  }
+
+  return { status: result.status };
 }
 
 async function cleanupSourceModules() {
@@ -142,7 +146,7 @@ async function main() {
   try {
     await buildSourceModules();
     await buildTests(!includeBlocking);
-    await runTests(verbose);
+    runTests(verbose);
 
     // Clean up
     cleanupSourceModules();

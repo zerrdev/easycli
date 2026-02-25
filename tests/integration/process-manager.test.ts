@@ -360,6 +360,7 @@ describe('ProcessManager Integration Tests', () => {
     it('should work with Windows-specific commands', async function skipOnNonWindows() {
       if (process.platform !== 'win32') {
         this.skip();
+        return; // Ensure we don't continue execution after skip
       }
 
       const items: ProcessItem[] = [
@@ -376,6 +377,7 @@ describe('ProcessManager Integration Tests', () => {
     it('should work with Unix-specific commands', async function skipOnWindows() {
       if (process.platform === 'win32') {
         this.skip();
+        return; // Ensure we don't continue execution after skip
       }
 
       const items: ProcessItem[] = [
