@@ -81,8 +81,8 @@ groups:
     tool: echo
     restart: no
     items:
-      - hello
-      - world
+      hello: hello
+      world: world
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -104,11 +104,11 @@ groups:
         // We'll just verify the initial setup doesn't throw
         const { ConfigLoader } = await import('../../src/config/loader.js');
         const loader = new ConfigLoader();
-        const { config } = loader.getGroup('echo-test');
+        const { config, items } = loader.getGroup('echo-test');
 
         assert.strictEqual(config.tool, 'echo');
         assert.strictEqual(config.restart, 'no');
-        assert.strictEqual(config.items.length, 2);
+        assert.strictEqual(items.length, 2);
       } catch (err) {
         assert.fail(`Should not throw: ${err}`);
       }
@@ -133,7 +133,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -151,7 +151,7 @@ groups:
     tool: echo
     restart: yes
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -177,9 +177,9 @@ groups:
     tool: docker
     restart: unless-stopped
     items:
-      - nginx,nginx,-p,80:80
-      - redis,redis
-      - postgres,postgres,-e,POSTGRES_PASSWORD=test
+      nginx: nginx,nginx,-p,80:80
+      redis: redis,redis
+      postgres: postgres,postgres,-e,POSTGRES_PASSWORD=test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -205,8 +205,8 @@ groups:
     tool: echo
     restart: no
     items:
-      - item1,arg1,arg2
-      - item2,arg3,arg4,arg5
+      item1: item1,arg1,arg2
+      item2: item2,arg3,arg4,arg5
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -227,7 +227,7 @@ groups:
   empty:
     tool: echo
     restart: no
-    items: []
+    items: {}
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -248,7 +248,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -279,8 +279,8 @@ groups:
     tool: node
     restart: no
     items:
-      - server.js,3000
-      - worker.js
+      server: server.js,3000
+      worker: worker.js
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -302,9 +302,9 @@ groups:
     tool: echo
     restart: no
     items:
-      - service1
-      - service2
-      - service3
+      service1: service1
+      service2: service2
+      service3: service3
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -318,9 +318,9 @@ groups:
       // Then verify config loads for up
       const { ConfigLoader } = await import('../../src/config/loader.js');
       const loader = new ConfigLoader();
-      const { config } = loader.getGroup('workflow-test');
+      const { items } = loader.getGroup('workflow-test');
 
-      assert.strictEqual(config.items.length, 3);
+      assert.strictEqual(items.length, 3);
     });
 
     it('should handle multiple groups in config', async () => {
@@ -330,19 +330,19 @@ groups:
     tool: echo
     restart: no
     items:
-      - item1
+      item1: item1
 
   group2:
     tool: echo
     restart: yes
     items:
-      - item2
+      item2: item2
 
   group3:
     tool: echo
     restart: unless-stopped
     items:
-      - item3
+      item3: item3
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -399,7 +399,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
     extra_item_field: should be ignored
 `;
 
@@ -422,7 +422,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -441,9 +441,9 @@ groups:
     tool: echo
     restart: no
     items:
-      - "service,with,commas"
-      - "another test"
-      - simple
+      service: "service,with,commas"
+      another: "another test"
+      simple: simple
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -464,19 +464,19 @@ groups:
     tool: echo
     restart: yes
     items:
-      - test
+      test: test
 
   restart-no:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
 
   restart-unless-stopped:
     tool: echo
     restart: unless-stopped
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -506,13 +506,13 @@ groups:
     tool: docker
     restart: no
     items:
-      - nginx,nginx
+      nginx: nginx,nginx
 
   node-group:
     tool: node
     restart: yes
     items:
-      - server.js
+      server: server.js
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -537,7 +537,7 @@ groups:
     tool: nonexistent-tool
     restart: no
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -559,14 +559,14 @@ groups:
     tool: docker
     restart: no
     items:
-      - nginx
-      - redis
+      nginx: nginx
+      redis: redis
 
   database:
     tool: docker
     restart: yes
     items:
-      - postgres
+      postgres: postgres
 `;
       fs.writeFileSync(testConfigPath, configContent);
       resetOutput();
@@ -590,15 +590,15 @@ groups:
     tool: docker
     restart: unless-stopped
     items:
-      - nginx
-      - redis
-      - postgres
+      nginx: nginx
+      redis: redis
+      postgres: postgres
 
   direct:
     tool: node
     restart: no
     items:
-      - server.js
+      server: server.js
 `;
       fs.writeFileSync(testConfigPath, configContent);
       resetOutput();

@@ -263,8 +263,9 @@ describe('ProcessManager Integration Tests', () => {
   describe('Restart policies', () => {
     it('should not restart processes with restart=no', async () => {
       // Create a process that exits immediately
+      // Use node -e "process.exit(0)" for cross-platform compatibility
       const items: ProcessItem[] = [
-        { name: 'no-restart', args: [], fullCmd: process.platform === 'win32' ? 'exit 0' : 'true' }
+        { name: 'no-restart', args: [], fullCmd: 'node -e "process.exit(0)"' }
       ];
 
       manager.spawnGroup('no-restart-group', items, 'no');

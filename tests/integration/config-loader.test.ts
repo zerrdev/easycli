@@ -53,15 +53,15 @@ groups:
     tool: docker
     restart: yes
     items:
-      - alpine,sh
-      - nginx,nginx,-p,80:80
+      alpine: alpine,sh
+      nginx: nginx,nginx,-p,80:80
 
   test2:
     tool: node
     restart: no
     items:
-      - server.js
-      - worker.js
+      server: server.js
+      worker: worker.js
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -74,9 +74,9 @@ groups:
       assert.strictEqual(Object.keys(config.groups).length, 2);
       assert.strictEqual(config.groups.test1.tool, 'docker');
       assert.strictEqual(config.groups.test1.restart, 'yes');
-      assert.strictEqual(config.groups.test1.items.length, 2);
+      assert.strictEqual(Object.keys(config.groups.test1.items).length, 2);
       assert.strictEqual(config.groups.test2.tool, 'node');
-      assert.strictEqual(config.groups.test2.items.length, 2);
+      assert.strictEqual(Object.keys(config.groups.test2.items).length, 2);
     });
 
     it('should throw ConfigError when config file does not exist', () => {
@@ -149,8 +149,8 @@ groups:
     tool: echo
     restart: no
     items:
-      - hello
-      - world
+      hello: hello
+      world: world
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -176,15 +176,15 @@ groups:
     tool: docker
     restart: unless-stopped
     items:
-      - nginx,nginx,-p,80:80
-      - redis,redis
+      nginx: nginx,nginx,-p,80:80
+      redis: redis,redis
 
   api:
     tool: node
     restart: yes
     items:
-      - server.js,3000
-      - worker.js
+      server: server.js,3000
+      worker: worker.js
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -198,7 +198,7 @@ groups:
       assert.strictEqual(result.config.restart, 'unless-stopped');
       assert.strictEqual(result.tool, 'docker');
       assert.strictEqual(result.toolTemplate, 'docker run -it --rm');
-      assert.strictEqual(result.config.items.length, 2);
+      assert.strictEqual(result.items.length, 2);
     });
 
     it('should retrieve an existing group without registered tool', () => {
@@ -209,7 +209,7 @@ groups:
       assert.strictEqual(result.config.restart, 'yes');
       assert.strictEqual(result.tool, null); // No registered tool
       assert.strictEqual(result.toolTemplate, null);
-      assert.strictEqual(result.config.items.length, 2);
+      assert.strictEqual(result.items.length, 2);
     });
 
     it('should throw ConfigError for unknown group', () => {
@@ -235,19 +235,19 @@ groups:
     tool: echo
     restart: no
     items:
-      - test1
+      test1: test1
 
   group2:
     tool: echo
     restart: no
     items:
-      - test2
+      test2: test2
 
   group3:
     tool: echo
     restart: no
     items:
-      - test3
+      test3: test3
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -284,7 +284,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(customConfigPath, configContent);
@@ -322,7 +322,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - from-home
+      fromHome: from-home
 `;
 
       const currentContent = `
@@ -331,7 +331,7 @@ groups:
     tool: echo
     restart: no
     items:
-      - from-current
+      fromCurrent: from-current
 `;
 
       // Write home config (mocked to testConfigDir)
@@ -353,21 +353,21 @@ groups:
   });
 
   describe('Edge cases', () => {
-    it('should handle empty items array', () => {
+    it('should handle empty items object', () => {
       const configContent = `
 groups:
   empty:
     tool: echo
     restart: no
-    items: []
+    items: {}
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
 
       const loader = new ConfigLoader();
-      const config = loader.load();
+      const result = loader.getGroup('empty');
 
-      assert.strictEqual(config.groups.empty.items.length, 0);
+      assert.strictEqual(result.items.length, 0);
     });
 
     it('should handle special characters in item strings', () => {
@@ -377,9 +377,9 @@ groups:
     tool: echo
     restart: no
     items:
-      - "hello, world"
-      - "test,with,commas"
-      - "spaces test"
+      hello: "hello, world"
+      test: "test,with,commas"
+      spaces: "spaces test"
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
@@ -387,9 +387,9 @@ groups:
       const loader = new ConfigLoader();
       const result = loader.getGroup('special');
 
-      assert.strictEqual(result.config.items.length, 3);
-      assert.strictEqual(result.config.items[0], 'hello, world');
-      assert.strictEqual(result.config.items[1], 'test,with,commas');
+      assert.strictEqual(result.items.length, 3);
+      assert.strictEqual(result.items[0].value, 'hello, world');
+      assert.strictEqual(result.items[1].value, 'test,with,commas');
     });
 
     it('should handle all restart policy values', () => {
@@ -399,19 +399,19 @@ groups:
     tool: echo
     restart: yes
     items:
-      - test
+      test: test
 
   restart-no:
     tool: echo
     restart: no
     items:
-      - test
+      test: test
 
   restart-unless-stopped:
     tool: echo
     restart: unless-stopped
     items:
-      - test
+      test: test
 `;
 
       fs.writeFileSync(testConfigPath, configContent);
