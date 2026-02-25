@@ -105,7 +105,14 @@ export class ConfigLoader {
     }
   }
 
-  getGroup(name: string): { config: GroupConfig; tool: string | null; toolTemplate: string | null; params: Record<string, string> } {
+  private normalizeItems(items: Record<string, string>): ItemEntry[] {
+    return Object.entries(items).map(([name, value]) => ({
+      name,
+      value
+    }));
+  }
+
+  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; tool: string | null; toolTemplate: string | null; params: Record<string, string> } {
     const config = this.load();
     const group = config.groups[name];
 
@@ -113,6 +120,9 @@ export class ConfigLoader {
       const available = Object.keys(config.groups).join(', ');
       throw new ConfigError(`Unknown group: ${name}. Available: ${available}`);
     }
+
+    // Normalize items to ItemEntry[]
+    const items = this.normalizeItems(group.items);
 
     // Resolve tool
     let toolTemplate: string | null = null;
@@ -122,15 +132,13 @@ export class ConfigLoader {
       toolTemplate = config.tools[group.tool].cmd;
       tool = group.tool;
     } else {
-      // Tool might be a direct executable
       tool = null;
       toolTemplate = null;
     }
 
-    // Extract params (default to empty object)
     const params = group.params || {};
 
-    return { config: group, tool, toolTemplate, params };
+    return { config: group, items, tool, toolTemplate, params };
   }
 
   listGroups(): string[] {
