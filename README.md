@@ -5,7 +5,7 @@ A simple CLI tool for managing groups of concurrent processes.
 ## Installation
 
 ```bash
-npm install -g Cligri
+npm i -g cligr
 ```
 
 ## Configuration
