@@ -226,7 +226,9 @@ function serveHtml(): string {
     body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
     h1 { font-size: 1.25rem; margin: 0; padding: 0.75rem 1rem; border-bottom: 1px solid #ccc; background: #f8f8f8; }
     .container { display: flex; flex: 1; overflow: hidden; }
-    .sidebar { width: 320px; min-width: 260px; border-right: 1px solid #ccc; padding: 1rem; overflow-y: auto; background: #fafafa; }
+    .sidebar { width: 320px; min-width: 180px; max-width: 60vw; border-right: 1px solid #ccc; padding: 1rem; overflow-y: auto; background: #fafafa; }
+    .resizer { width: 6px; background: #e0e0e0; cursor: col-resize; flex-shrink: 0; }
+    .resizer:hover { background: #bbb; }
     .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
     .main h2 { font-size: 1rem; margin: 0; padding: 0.5rem 1rem; border-bottom: 1px solid #ccc; background: #f0f0f0; }
     .group { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; margin: 0 0 0.75rem 0; background: #fff; }
@@ -241,6 +243,7 @@ function serveHtml(): string {
   <h1>cligr serve</h1>
   <div class="container">
     <div class="sidebar" id="groups"></div>
+    <div class="resizer" id="resizer"></div>
     <div class="main">
       <h2>Console</h2>
       <div class="logs" id="logs"></div>
@@ -250,7 +253,29 @@ function serveHtml(): string {
   <script>
     const groupsEl = document.getElementById('groups');
     const logsEl = document.getElementById('logs');
+    const resizer = document.getElementById('resizer');
     let autoScroll = true;
+
+    resizer.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      document.body.style.cursor = 'col-resize';
+      const startX = e.clientX;
+      const startWidth = groupsEl.offsetWidth;
+
+      const onMove = (ev) => {
+        const newWidth = startWidth + (ev.clientX - startX);
+        groupsEl.style.width = Math.max(180, Math.min(newWidth, window.innerWidth * 0.6)) + 'px';
+      };
+
+      const onUp = () => {
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        document.body.style.cursor = '';
+      };
+
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
 
     async function fetchGroups() {
       const res = await fetch('/api/groups');
