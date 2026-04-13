@@ -313,6 +313,7 @@ groups:
       assert.strictEqual(exitCode, 0);
       const output = getLogOutput();
       assert.ok(output.includes('service1: service1'));
+      assert.ok(!output.includes('service1: service1 [disabled]'));
       assert.ok(output.includes('service2: service2 [disabled]'));
     });
   });
