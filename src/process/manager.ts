@@ -1,4 +1,5 @@
 import { spawn, ChildProcess } from 'child_process';
+import { EventEmitter } from 'events';
 import type { GroupConfig, ProcessItem } from '../config/types.js';
 import { PidStore, type PidEntry } from './pid-store.js';
 
@@ -12,7 +13,7 @@ export class ManagedProcess {
   ) {}
 }
 
-export class ProcessManager {
+export class ProcessManager extends EventEmitter {
   private groups = new Map<string, ManagedProcess[]>();
   private restartTimestamps = new Map<string, number[]>();
   private readonly maxRestarts = 3;
@@ -32,6 +33,12 @@ export class ProcessManager {
     }
 
     this.groups.set(groupName, processes);
+    this.emit('group-started', groupName);
+  }
+
+  async restartGroup(groupName: string, items: ProcessItem[], restartPolicy: GroupConfig['restart']): Promise<void> {
+    await this.killGroup(groupName);
+    this.spawnGroup(groupName, items, restartPolicy);
   }
 
   private spawnProcess(item: ProcessItem, groupName: string, restartPolicy: GroupConfig['restart']): ChildProcess {
@@ -66,16 +73,28 @@ export class ProcessManager {
       });
     }
 
-    // Prefix output with item name
+    // Prefix output with item name and emit events
+    const emitLines = (data: Buffer, isError: boolean) => {
+      const text = data.toString('utf-8');
+      const lines = text.split('\n');
+      for (const line of lines) {
+        if (line.length > 0 || lines.length > 1) {
+          this.emit('process-log', groupName, item.name, line, isError);
+        }
+      }
+    };
+
     if (proc.stdout) {
       proc.stdout.on('data', (data) => {
         process.stdout.write(`[${item.name}] ${data}`);
+        emitLines(data, false);
       });
     }
 
     if (proc.stderr) {
       proc.stderr.on('data', (data) => {
         process.stderr.write(`[${item.name}] ${data}`);
+        emitLines(data, true);
       });
     }
 
@@ -158,6 +177,7 @@ export class ProcessManager {
     setTimeout(() => {
       console.log(`[${item.name}] Restarting... (exit code: ${code})`);
       const newProc = this.spawnProcess(item, groupName, restartPolicy);
+      this.emit('item-restarted', groupName, item.name);
 
       // Update the ManagedProcess in the groups Map with the new process handle
       const processes = this.groups.get(groupName);
@@ -181,6 +201,7 @@ export class ProcessManager {
     // Clean up PID files after killing
     return Promise.all(killPromises).then(async () => {
       await this.pidStore.deleteGroupPids(groupName);
+      this.emit('group-stopped', groupName);
     });
   }
 

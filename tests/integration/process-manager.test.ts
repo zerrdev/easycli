@@ -391,4 +391,79 @@ describe('ProcessManager Integration Tests', () => {
       await manager.killGroup('unix-test');
     });
   });
+
+  describe('restartGroup()', () => {
+    it('should restart a running group', async () => {
+      const sleepCmd = process.platform === 'win32' ? 'timeout' : 'sleep';
+      const sleepFlag = process.platform === 'win32' ? '/t' : '';
+
+      const items: ProcessItem[] = [
+        { name: 'p1', args: ['5'], fullCmd: `${sleepCmd} ${sleepFlag} 5` }
+      ];
+
+      manager.spawnGroup('restart-group', items, 'no');
+      assert.strictEqual(manager.isGroupRunning('restart-group'), true);
+
+      await manager.restartGroup('restart-group', items, 'no');
+      assert.strictEqual(manager.isGroupRunning('restart-group'), true);
+
+      await manager.killGroup('restart-group');
+    });
+  });
+
+  describe('events', () => {
+    it('should emit group-started when spawning', async () => {
+      let emitted = false;
+      manager.once('group-started', (name) => {
+        assert.strictEqual(name, 'event-group');
+        emitted = true;
+      });
+
+      const items: ProcessItem[] = [
+        { name: 'p1', args: [], fullCmd: 'echo hello' }
+      ];
+
+      manager.spawnGroup('event-group', items, 'no');
+      assert.strictEqual(emitted, true);
+
+      await manager.killGroup('event-group');
+    });
+
+    it('should emit group-stopped when killing', async () => {
+      const items: ProcessItem[] = [
+        { name: 'p1', args: ['5'], fullCmd: process.platform === 'win32' ? 'timeout /t 5' : 'sleep 5' }
+      ];
+
+      manager.spawnGroup('stop-group', items, 'no');
+
+      let emitted = false;
+      manager.once('group-stopped', (name) => {
+        assert.strictEqual(name, 'stop-group');
+        emitted = true;
+      });
+
+      await manager.killGroup('stop-group');
+      assert.strictEqual(emitted, true);
+    });
+
+    it('should emit process-log events', async () => {
+      const items: ProcessItem[] = [
+        { name: 'logger', args: [], fullCmd: 'echo test-log' }
+      ];
+
+      const logs: Array<{ group: string; item: string; line: string; isError: boolean }> = [];
+      manager.on('process-log', (group, item, line, isError) => {
+        logs.push({ group, item, line, isError });
+      });
+
+      manager.spawnGroup('log-group', items, 'no');
+
+      // Wait for process to run
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      assert.ok(logs.some(l => l.group === 'log-group' && l.item === 'logger' && l.line.includes('test-log')));
+
+      await manager.killGroup('log-group');
+    });
+  });
 });
