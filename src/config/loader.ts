@@ -73,6 +73,7 @@ export class ConfigLoader {
       if (group && typeof group === 'object') {
         const groupObj = group as Record<string, unknown>;
         this.validateItems(groupObj.items, groupName);
+        this.validateDisabledItems(groupObj.items, groupObj.disabledItems, groupName);
       }
     }
 
@@ -102,6 +103,36 @@ export class ConfigLoader {
         );
       }
       seenNames.add(name);
+    }
+  }
+
+  private validateDisabledItems(items: unknown, disabledItems: unknown, groupName: string): void {
+    if (disabledItems === undefined || disabledItems === null) {
+      return;
+    }
+
+    if (!Array.isArray(disabledItems)) {
+      throw new ConfigError(`Group "${groupName}": disabledItems must be an array of strings`);
+    }
+
+    const seen = new Set<string>();
+    const itemKeys = items && typeof items === 'object' && !Array.isArray(items)
+      ? new Set(Object.keys(items as Record<string, unknown>))
+      : new Set<string>();
+
+    for (const entry of disabledItems) {
+      if (typeof entry !== 'string') {
+        throw new ConfigError(`Group "${groupName}": disabledItems must be an array of strings`);
+      }
+
+      if (seen.has(entry)) {
+        throw new ConfigError(`Group "${groupName}": disabledItems contains duplicate "${entry}"`);
+      }
+      seen.add(entry);
+
+      if (!itemKeys.has(entry)) {
+        throw new ConfigError(`Group "${groupName}": disabledItems entry "${entry}" does not match any item`);
+      }
     }
   }
 
@@ -157,6 +188,10 @@ export class ConfigLoader {
     const group = config.groups[groupName];
     if (!group) {
       throw new ConfigError(`Unknown group: ${groupName}`);
+    }
+
+    if (!Object.hasOwn(group.items || {}, itemName)) {
+      throw new ConfigError(`Item "${itemName}" not found in group "${groupName}"`);
     }
 
     const disabled = new Set(group.disabledItems || []);

@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { ConfigLoader, ConfigError } from '../../src/config/loader.js';
+import yaml from 'js-yaml';
 
 describe('ConfigLoader Integration Tests', () => {
   let testConfigDir: string;
@@ -330,7 +331,8 @@ groups:
       loader.saveConfig(config);
 
       const saved = fs.readFileSync(testConfigPath, 'utf-8');
-      assert.ok(saved.includes("restart: 'yes'") || saved.includes('restart: yes'));
+      const parsed = yaml.load(saved) as any;
+      assert.strictEqual(parsed.groups.test1.restart, 'yes');
     });
   });
 
