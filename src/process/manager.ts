@@ -37,7 +37,9 @@ export class ProcessManager extends EventEmitter {
   }
 
   async restartGroup(groupName: string, items: ProcessItem[], restartPolicy: GroupConfig['restart']): Promise<void> {
-    await this.killGroup(groupName);
+    if (this.isGroupRunning(groupName)) {
+      await this.killGroup(groupName);
+    }
     this.spawnGroup(groupName, items, restartPolicy);
   }
 
@@ -78,7 +80,7 @@ export class ProcessManager extends EventEmitter {
       const text = data.toString('utf-8');
       const lines = text.split('\n');
       for (const line of lines) {
-        if (line.length > 0 || lines.length > 1) {
+        if (line.length > 0) {
           this.emit('process-log', groupName, item.name, line, isError);
         }
       }
@@ -272,6 +274,10 @@ export class ProcessManager extends EventEmitter {
       killPromises.push(this.killGroup(groupName));
     }
     return Promise.all(killPromises).then(() => {});
+  }
+
+  async cleanupStalePids(): Promise<void> {
+    await this.pidStore.cleanupStalePids();
   }
 
   getGroupStatus(groupName: string): ProcessStatus[] {

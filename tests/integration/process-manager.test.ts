@@ -452,18 +452,46 @@ describe('ProcessManager Integration Tests', () => {
       ];
 
       const logs: Array<{ group: string; item: string; line: string; isError: boolean }> = [];
-      manager.on('process-log', (group, item, line, isError) => {
+      const handler = (group: string, item: string, line: string, isError: boolean) => {
         logs.push({ group, item, line, isError });
-      });
+      };
+      manager.once('process-log', handler);
 
       manager.spawnGroup('log-group', items, 'no');
 
-      // Wait for process to run
-      await new Promise(resolve => setTimeout(resolve, 500));
+      // Wait for process-log event or a small timeout
+      await Promise.race([
+        new Promise<void>(resolve => manager.once('process-log', () => resolve())),
+        new Promise<void>(resolve => setTimeout(resolve, 200))
+      ]);
 
       assert.ok(logs.some(l => l.group === 'log-group' && l.item === 'logger' && l.line.includes('test-log')));
 
+      manager.off('process-log', handler);
       await manager.killGroup('log-group');
+    });
+
+    it('should emit item-restarted when a process restarts', { timeout: 3000 }, async () => {
+      const items: ProcessItem[] = [
+        { name: 'quick-exit', args: [], fullCmd: 'node -e "process.exit(0)"' }
+      ];
+
+      let restartedGroup = '';
+      let restartedItem = '';
+      manager.once('item-restarted', (groupName, itemName) => {
+        restartedGroup = groupName;
+        restartedItem = itemName;
+      });
+
+      manager.spawnGroup('restart-event-group', items, 'yes');
+
+      // Wait for the process to exit and restart (1-second delay + margin)
+      await new Promise(resolve => setTimeout(resolve, 2500));
+
+      assert.strictEqual(restartedGroup, 'restart-event-group');
+      assert.strictEqual(restartedItem, 'quick-exit');
+
+      await manager.killGroup('restart-event-group');
     });
   });
 });
