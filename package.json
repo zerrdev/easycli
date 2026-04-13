@@ -3,10 +3,10 @@
   "version": "1.0.6",
   "main": "dist/index.js",
   "bin": {
-    "cligr": "./dist/index.js"
+    "cligr": "dist/index.js"
   },
   "type": "module",
-  "author": "zerr",
+  "author": "zerrdev",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build.js",
