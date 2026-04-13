@@ -311,6 +311,114 @@ groups:
     });
   });
 
+  describe('saveConfig()', () => {
+    it('should save config back to file', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    items:
+      hello: hello
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const config = loader.load();
+      config.groups.test1.restart = 'yes';
+
+      loader.saveConfig(config);
+
+      const saved = fs.readFileSync(testConfigPath, 'utf-8');
+      assert.ok(saved.includes("restart: 'yes'") || saved.includes('restart: yes'));
+    });
+  });
+
+  describe('toggleItem()', () => {
+    it('should add item to disabledItems when disabling', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    items:
+      hello: hello
+      world: world
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      loader.toggleItem('test1', 'hello', false);
+
+      const reloaded = new ConfigLoader().load();
+      assert.deepStrictEqual(reloaded.groups.test1.disabledItems, ['hello']);
+    });
+
+    it('should remove item from disabledItems when enabling', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    disabledItems:
+      - hello
+    items:
+      hello: hello
+      world: world
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      loader.toggleItem('test1', 'hello', true);
+
+      const reloaded = new ConfigLoader().load();
+      assert.strictEqual(reloaded.groups.test1.disabledItems, undefined);
+    });
+  });
+
+  describe('disabledItems filtering', () => {
+    it('should filter disabled items from getGroup result', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    disabledItems:
+      - hello
+    items:
+      hello: hello
+      world: world
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('test1');
+
+      assert.strictEqual(result.items.length, 1);
+      assert.strictEqual(result.items[0].name, 'world');
+      assert.strictEqual(result.config.disabledItems?.length, 1);
+    });
+
+    it('should include all items when disabledItems is empty', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    disabledItems: []
+    items:
+      hello: hello
+      world: world
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('test1');
+
+      assert.strictEqual(result.items.length, 2);
+    });
+  });
+
   describe('Config precedence', () => {
     it('should prefer home directory config over current directory', () => {
       const homeConfigPath = path.join(testConfigDir, '.cligr.yml');

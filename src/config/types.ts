@@ -11,6 +11,7 @@ export interface GroupConfig {
   tool: string;
   restart?: 'yes' | 'no' | 'unless-stopped';
   params?: Record<string, string>;
+  disabledItems?: string[];
   items: Record<string, string>;
 }
 

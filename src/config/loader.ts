@@ -121,8 +121,14 @@ export class ConfigLoader {
       throw new ConfigError(`Unknown group: ${name}. Available: ${available}`);
     }
 
-    // Normalize items to ItemEntry[]
-    const items = this.normalizeItems(group.items);
+    const disabled = new Set(group.disabledItems || []);
+    const enabledItems: Record<string, string> = {};
+    for (const [name, value] of Object.entries(group.items)) {
+      if (!disabled.has(name)) {
+        enabledItems[name] = value;
+      }
+    }
+    const items = this.normalizeItems(enabledItems);
 
     // Resolve tool
     let toolTemplate: string | null = null;
@@ -139,6 +145,34 @@ export class ConfigLoader {
     const params = group.params || {};
 
     return { config: group, items, tool, toolTemplate, params };
+  }
+
+  saveConfig(config: CliGrConfig): void {
+    const yamlContent = yaml.dump(config, { indent: 2, lineWidth: -1 });
+    fs.writeFileSync(this.configPath, yamlContent, 'utf-8');
+  }
+
+  toggleItem(groupName: string, itemName: string, enabled: boolean): void {
+    const config = this.load();
+    const group = config.groups[groupName];
+    if (!group) {
+      throw new ConfigError(`Unknown group: ${groupName}`);
+    }
+
+    const disabled = new Set(group.disabledItems || []);
+    if (enabled) {
+      disabled.delete(itemName);
+    } else {
+      disabled.add(itemName);
+    }
+
+    if (disabled.size === 0) {
+      delete (group as Record<string, unknown>).disabledItems;
+    } else {
+      group.disabledItems = Array.from(disabled);
+    }
+
+    this.saveConfig(config);
   }
 
   listGroups(): string[] {
