@@ -292,6 +292,29 @@ groups:
       const output = getLogOutput();
       assert.ok(output.includes('Tool: node'));
     });
+
+    it('should mark disabled items in ls output', async () => {
+      const configContent = `
+groups:
+  mixed:
+    tool: echo
+    restart: no
+    disabledItems:
+      - service2
+    items:
+      service1: service1
+      service2: service2
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+      resetOutput();
+
+      const exitCode = await lsCommand('mixed');
+
+      assert.strictEqual(exitCode, 0);
+      const output = getLogOutput();
+      assert.ok(output.includes('service1: service1'));
+      assert.ok(output.includes('service2: service2 [disabled]'));
+    });
   });
 
   describe('Command integration scenarios', () => {
