@@ -143,6 +143,13 @@ export class ProcessManager extends EventEmitter {
   }
 
   private handleExit(groupName: string, item: ProcessItem, restartPolicy: GroupConfig['restart'], code: number | null, signal: NodeJS.Signals | null): void {
+    // If killed by cligr via killGroup, the group is removed from the map before SIGTERM is sent.
+    // Don't restart processes that were intentionally stopped.
+    if (signal === 'SIGTERM' && !this.groups.has(groupName)) {
+      this.pidStore.deletePid(groupName, item.name).catch(() => {});
+      return;
+    }
+
     // Check if killed by cligr (don't restart if unless-stopped)
     // SIGTERM works on both Unix and Windows in Node.js
     if (restartPolicy === 'unless-stopped' && signal === 'SIGTERM') {
