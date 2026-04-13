@@ -15,11 +15,13 @@ export async function serveCommand(portArg?: string): Promise<number> {
 
   const sendEvent = (event: string, data: unknown) => {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
-    for (const client of clients) {
+    for (let i = clients.length - 1; i >= 0; i--) {
+      const client = clients[i];
       try {
         client.write(payload);
       } catch {
-        // Client disconnected
+        clients.splice(i, 1);
+        try { client.end(); } catch { /* ignore */ }
       }
     }
   };
@@ -190,12 +192,26 @@ export async function serveCommand(portArg?: string): Promise<number> {
     }
   });
 
+  let resolveCommand: (value: number) => void;
+  const commandPromise = new Promise<number>((resolve) => {
+    resolveCommand = resolve;
+  });
+
+  const shutdown = async () => {
+    console.log('\nShutting down...');
+    server.close();
+    await manager.killAll();
+    resolveCommand(0);
+  };
+
+  process.on('SIGINT', shutdown);
+  process.on('SIGTERM', shutdown);
+
   server.listen(port, () => {
     console.log(`cligr serve running at http://localhost:${port}`);
   });
 
-  // Keep process alive
-  return new Promise(() => {});
+  return commandPromise;
 }
 
 function serveHtml(): string {
