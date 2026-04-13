@@ -1,13 +1,10 @@
-import { ConfigLoader, ConfigError } from '../config/loader.js';
+import { ConfigLoader } from '../config/loader.js';
 
 export async function lsCommand(groupName: string): Promise<number> {
   const loader = new ConfigLoader();
 
   try {
-    const config = loader.load().groups[groupName];
-    if (!config) {
-      throw new ConfigError(`Unknown group: ${groupName}. Available: ${loader.listGroups().join(', ')}`);
-    }
+    const { config } = loader.getGroup(groupName);
 
     console.log(`\nGroup: ${groupName}`);
     console.log(`Tool: ${config.tool}`);
@@ -23,11 +20,11 @@ export async function lsCommand(groupName: string): Promise<number> {
     console.log('');
 
     return 0;
-  } catch (err) {
-    if (err instanceof Error && err.name === 'ConfigError') {
-      console.error(err.message);
+  } catch (error) {
+    if (error instanceof Error && error.name === 'ConfigError') {
+      console.error(error.message);
       return 1;
     }
-    throw err;
+    throw error;
   }
 }
