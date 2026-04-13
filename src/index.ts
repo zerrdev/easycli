@@ -4,6 +4,7 @@ import { upCommand } from './commands/up.js';
 import { lsCommand } from './commands/ls.js';
 import { configCommand } from './commands/config.js';
 import { groupsCommand } from './commands/groups.js';
+import { serveCommand } from './commands/serve.js';
 
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
@@ -18,7 +19,7 @@ async function main(): Promise<void> {
   let verbose = false;
 
   // Check if this is a known command
-  const knownCommands = ['config', 'up', 'ls', 'groups'];
+  const knownCommands = ['config', 'up', 'ls', 'groups', 'serve'];
 
   if (knownCommands.includes(firstArg)) {
     // It's a command
@@ -38,7 +39,7 @@ async function main(): Promise<void> {
     groupName = rest[0];
 
     // config and groups commands don't require group name
-    if (command !== 'config' && command !== 'groups' && !groupName) {
+    if (command !== 'config' && command !== 'groups' && command !== 'serve' && !groupName) {
       console.error('Error: group name required');
       printUsage();
       process.exit(1);
@@ -60,6 +61,9 @@ async function main(): Promise<void> {
       case 'groups':
         exitCode = await groupsCommand(verbose);
         break;
+      case 'serve':
+        exitCode = await serveCommand(rest[0]);
+        break;
     }
 
     process.exit(exitCode);
@@ -78,6 +82,7 @@ Commands:
   config              Open config file in editor
   ls <group>          List all items in the group
   groups [-v|--verbose]  List all groups
+  serve [port]        Start web UI server (default port 7373)
 
 Options:
   -v, --verbose       Show detailed group information
@@ -88,6 +93,8 @@ Examples:
   cligr ls test1
   cligr groups
   cligr groups -v
+  cligr serve
+  cligr serve 8080
 `);
 }
 

@@ -202,7 +202,7 @@ export class ConfigLoader {
     }
 
     if (disabled.size === 0) {
-      delete (group as Record<string, unknown>).disabledItems;
+      delete (group as unknown as Record<string, unknown>).disabledItems;
     } else {
       group.disabledItems = Array.from(disabled);
     }
