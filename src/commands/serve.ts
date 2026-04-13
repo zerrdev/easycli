@@ -221,21 +221,31 @@ function serveHtml(): string {
   <meta charset="utf-8">
   <title>cligr serve</title>
   <style>
-    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-    h1 { font-size: 1.5rem; }
-    .group { border: 1px solid #ccc; border-radius: 6px; padding: 1rem; margin: 1rem 0; }
-    .group-header { display: flex; align-items: center; gap: 0.5rem; font-weight: bold; font-size: 1.1rem; }
-    .items { margin: 0.5rem 0 0 1.5rem; }
-    .item { display: flex; align-items: center; gap: 0.4rem; margin: 0.25rem 0; }
-    .logs { background: #111; color: #0f0; font-family: monospace; font-size: 0.85rem; height: 300px; overflow-y: auto; padding: 0.75rem; border-radius: 4px; white-space: pre-wrap; }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; }
+    h1 { font-size: 1.25rem; margin: 0; padding: 0.75rem 1rem; border-bottom: 1px solid #ccc; background: #f8f8f8; }
+    .container { display: flex; flex: 1; overflow: hidden; }
+    .sidebar { width: 320px; min-width: 260px; border-right: 1px solid #ccc; padding: 1rem; overflow-y: auto; background: #fafafa; }
+    .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+    .main h2 { font-size: 1rem; margin: 0; padding: 0.5rem 1rem; border-bottom: 1px solid #ccc; background: #f0f0f0; }
+    .group { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; margin: 0 0 0.75rem 0; background: #fff; }
+    .group-header { display: flex; align-items: center; gap: 0.5rem; font-weight: bold; font-size: 1rem; }
+    .items { margin: 0.5rem 0 0 1.25rem; }
+    .item { display: flex; align-items: center; gap: 0.4rem; margin: 0.2rem 0; font-size: 0.9rem; }
+    .logs { flex: 1; background: #111; color: #0f0; font-family: monospace; font-size: 0.85rem; overflow-y: auto; padding: 0.75rem; white-space: pre-wrap; }
     .error { color: #f55; }
   </style>
 </head>
 <body>
   <h1>cligr serve</h1>
-  <div id="groups"></div>
-  <h2>Logs</h2>
-  <div class="logs" id="logs"></div>
+  <div class="container">
+    <div class="sidebar" id="groups"></div>
+    <div class="main">
+      <h2>Console</h2>
+      <div class="logs" id="logs"></div>
+    </div>
+  </div>
 
   <script>
     const groupsEl = document.getElementById('groups');
