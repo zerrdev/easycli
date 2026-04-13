@@ -230,13 +230,18 @@ function serveHtml(): string {
     .resizer { width: 6px; background: #e0e0e0; cursor: col-resize; flex-shrink: 0; }
     .resizer:hover { background: #bbb; }
     .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-    .main h2 { font-size: 1rem; margin: 0; padding: 0.5rem 1rem; border-bottom: 1px solid #ccc; background: #f0f0f0; }
+    .main-header { display: flex; align-items: center; justify-content: space-between; font-size: 1rem; padding: 0.5rem 1rem; border-bottom: 1px solid #ccc; background: #f0f0f0; }
+    .main-header h2 { font-size: 1rem; margin: 0; }
+    .clear-btn { font-size: 0.8rem; padding: 0.25rem 0.6rem; cursor: pointer; }
     .group { border: 1px solid #ccc; border-radius: 6px; padding: 0.75rem; margin: 0 0 0.75rem 0; background: #fff; }
     .group-header { display: flex; align-items: center; gap: 0.5rem; font-weight: bold; font-size: 1rem; }
     .items { margin: 0.5rem 0 0 1.25rem; }
     .item { display: flex; align-items: center; gap: 0.4rem; margin: 0.2rem 0; font-size: 0.9rem; }
     .logs { flex: 1; background: #111; color: #0f0; font-family: monospace; font-size: 0.85rem; overflow-y: auto; padding: 0.75rem; white-space: pre-wrap; }
-    .error { color: #f55; }
+    .log-line { margin: 0.1rem 0; }
+    .log-time { color: #888; }
+    .log-system { color: #6cf; }
+    .log-error { color: #f55; }
   </style>
 </head>
 <body>
@@ -245,7 +250,10 @@ function serveHtml(): string {
     <div class="sidebar" id="groups"></div>
     <div class="resizer" id="resizer"></div>
     <div class="main">
-      <h2>Console</h2>
+      <div class="main-header">
+        <h2>Console</h2>
+        <button class="clear-btn" id="clearBtn">Clear</button>
+      </div>
       <div class="logs" id="logs"></div>
     </div>
   </div>
@@ -255,6 +263,11 @@ function serveHtml(): string {
     const logsEl = document.getElementById('logs');
     const resizer = document.getElementById('resizer');
     let autoScroll = true;
+
+    const clearBtn = document.getElementById('clearBtn');
+    clearBtn.addEventListener('click', () => {
+      logsEl.innerHTML = '';
+    });
 
     resizer.addEventListener('mousedown', (e) => {
       e.preventDefault();
@@ -333,16 +346,60 @@ function serveHtml(): string {
       autoScroll = logsEl.scrollTop + logsEl.clientHeight >= logsEl.scrollHeight - 10;
     });
 
+    function formatTime() {
+      const now = new Date();
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const ss = String(now.getSeconds()).padStart(2, '0');
+      return \`[\${hh}:\${mm}:\${ss}] \`;
+    }
+
     function appendLog(line, isError) {
-      const span = document.createElement('div');
-      span.textContent = line;
-      if (isError) span.className = 'error';
-      logsEl.appendChild(span);
+      const div = document.createElement('div');
+      div.className = 'log-line';
+
+      const time = document.createElement('span');
+      time.className = 'log-time';
+      time.textContent = formatTime();
+      div.appendChild(time);
+
+      const content = document.createElement('span');
+      content.textContent = line;
+      if (isError) content.className = 'log-error';
+      div.appendChild(content);
+
+      logsEl.appendChild(div);
+      if (autoScroll) logsEl.scrollTop = logsEl.scrollHeight;
+    }
+
+    function appendSystemLog(message) {
+      const div = document.createElement('div');
+      div.className = 'log-line';
+
+      const time = document.createElement('span');
+      time.className = 'log-time';
+      time.textContent = formatTime();
+      div.appendChild(time);
+
+      const content = document.createElement('span');
+      content.className = 'log-system';
+      content.textContent = message;
+      div.appendChild(content);
+
+      logsEl.appendChild(div);
       if (autoScroll) logsEl.scrollTop = logsEl.scrollHeight;
     }
 
     const evtSource = new EventSource('/api/events');
     evtSource.addEventListener('status', (e) => {
+      const data = JSON.parse(e.data);
+      if (data.type === 'group-started') {
+        appendSystemLog(\`[system] Group "\${data.groupName}" started\`);
+      } else if (data.type === 'group-stopped') {
+        appendSystemLog(\`[system] Group "\${data.groupName}" stopped\`);
+      } else if (data.type === 'item-restarted') {
+        appendSystemLog(\`[system] Item "\${data.groupName}/\${data.itemName}" restarted\`);
+      }
       fetchGroups();
     });
     evtSource.addEventListener('log', (e) => {
