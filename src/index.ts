@@ -81,7 +81,7 @@ Usage: cligr <group> | <command> [options]
 Commands:
   config              Open config file in editor
   ls <group>          List all items in the group
-  groups [-v|--verbose]  List all groups
+  groups [-v|--verbose]   List all groups
   serve [port]        Start web UI server (default port 7373)
 
 Options:

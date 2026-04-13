@@ -16,7 +16,11 @@ export async function serveCommand(portArg?: string): Promise<number> {
   const sendEvent = (event: string, data: unknown) => {
     const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const client of clients) {
-      client.write(payload);
+      try {
+        client.write(payload);
+      } catch {
+        // Client disconnected
+      }
     }
   };
 
@@ -102,8 +106,16 @@ export async function serveCommand(portArg?: string): Promise<number> {
       let body = '';
       req.on('data', (chunk) => body += chunk);
       req.on('end', async () => {
+        let parsed;
         try {
-          const { enabled } = JSON.parse(body);
+          parsed = JSON.parse(body);
+        } catch {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          return;
+        }
+        const { enabled } = parsed;
+        try {
           if (enabled) {
             const { config, items, tool, toolTemplate, params } = loader.getGroup(groupName);
             const processItems = items.map((item, index) =>
@@ -132,8 +144,16 @@ export async function serveCommand(portArg?: string): Promise<number> {
       let body = '';
       req.on('data', (chunk) => body += chunk);
       req.on('end', async () => {
+        let parsed;
         try {
-          const { enabled } = JSON.parse(body);
+          parsed = JSON.parse(body);
+        } catch {
+          res.writeHead(400);
+          res.end(JSON.stringify({ error: 'Invalid JSON' }));
+          return;
+        }
+        const { enabled } = parsed;
+        try {
           loader.toggleItem(groupName, itemName, enabled);
 
           if (manager.isGroupRunning(groupName)) {
