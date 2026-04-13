@@ -81,7 +81,11 @@ export class ConfigLoader {
   }
 
   private validateItems(items: unknown, groupName: string): void {
-    if (!items || typeof items !== 'object' || Array.isArray(items)) {
+    if (items === undefined || items === null) {
+      return;
+    }
+
+    if (typeof items !== 'object' || Array.isArray(items)) {
       throw new ConfigError(
         `Group "${groupName}": items must be an object with named entries, e.g.:\n` +
         '  items:\n' +
@@ -154,7 +158,7 @@ export class ConfigLoader {
 
     const disabled = new Set(group.disabledItems || []);
     const enabledItems: Record<string, string> = {};
-    for (const [name, value] of Object.entries(group.items)) {
+    for (const [name, value] of Object.entries(group.items || {})) {
       if (!disabled.has(name)) {
         enabledItems[name] = value;
       }

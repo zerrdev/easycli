@@ -70,7 +70,7 @@ export async function serveCommand(portArg?: string): Promise<number> {
           name,
           tool: group.tool,
           restart: group.restart,
-          items: Object.entries(group.items).map(([itemName, value]) => ({
+          items: Object.entries(group.items || {}).map(([itemName, value]) => ({
             name: itemName,
             value,
             enabled: !(group.disabledItems || []).includes(itemName),

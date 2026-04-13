@@ -12,7 +12,7 @@ export interface GroupConfig {
   restart?: 'yes' | 'no' | 'unless-stopped';
   params?: Record<string, string>;
   disabledItems?: string[];
-  items: Record<string, string>;
+  items?: Record<string, string>;
 }
 
 export interface CliGrConfig {

@@ -12,7 +12,7 @@ export async function lsCommand(groupName: string): Promise<number> {
     console.log('\nItems:');
 
     const disabled = new Set(config.disabledItems || []);
-    for (const [name, value] of Object.entries(config.items)) {
+    for (const [name, value] of Object.entries(config.items || {})) {
       const marker = disabled.has(name) ? ' [disabled]' : '';
       console.log(`  ${name}: ${value}${marker}`);
     }
