@@ -31,6 +31,7 @@ Example config:
 tools:
   kubefwd:
     cmd: kubectl port-forward $1 $2:$3
+    restart: yes
 
 groups:
   myapp:
@@ -59,6 +60,8 @@ cligr groups -v           # List groups with details
 ```
 
 ## Restart Policies
+
+Restart can be set on a **tool** (as a default) or on a **group** (to override the tool default).
 
 - `yes` - Always restart on exit
 - `no` - Never restart

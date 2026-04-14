@@ -198,6 +198,31 @@ groups:
       assert.ok(output.includes('postgres'));
     });
 
+    it('should show inherited restart from tool in ls output', async () => {
+      const configContent = `
+tools:
+  docker:
+    cmd: docker run -it --rm
+    restart: yes
+
+groups:
+  web:
+    tool: docker
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+      resetOutput();
+
+      const exitCode = await lsCommand('web');
+
+      assert.strictEqual(exitCode, 0);
+      const output = getLogOutput();
+      assert.ok(output.includes('Group: web'));
+      assert.ok(output.includes('Restart: yes'));
+    });
+
     it('should list items with correct arguments', async () => {
       const configContent = `
 groups:
@@ -642,6 +667,32 @@ groups:
       assert.ok(output.includes('direct'));
       assert.ok(output.includes('node'));
       assert.ok(output.includes('1')); // item count for direct
+    });
+
+    it('should show inherited restart from tool in verbose mode', async () => {
+      const configContent = `
+tools:
+  docker:
+    cmd: docker run
+    restart: yes
+
+groups:
+  web:
+    tool: docker
+    items:
+      nginx: nginx
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+      resetOutput();
+
+      const exitCode = await groupsCommand(true);
+
+      assert.strictEqual(exitCode, 0);
+      const output = getLogOutput();
+      assert.ok(output.includes('GROUP'));
+      assert.ok(output.includes('RESTART'));
+      assert.ok(output.includes('web'));
+      assert.ok(output.includes('yes'));
     });
 
     it('should handle empty groups list', async () => {

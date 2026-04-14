@@ -1,5 +1,6 @@
 export interface ToolConfig {
   cmd: string;
+  restart?: 'yes' | 'no' | 'unless-stopped';
 }
 
 export interface ItemEntry {

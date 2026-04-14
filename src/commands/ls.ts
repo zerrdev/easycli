@@ -4,11 +4,11 @@ export async function lsCommand(groupName: string): Promise<number> {
   const loader = new ConfigLoader();
 
   try {
-    const { config } = loader.getGroup(groupName);
+    const { config, restart } = loader.getGroup(groupName);
 
     console.log(`\nGroup: ${groupName}`);
     console.log(`Tool: ${config.tool}`);
-    console.log(`Restart: ${config.restart}`);
+    console.log(`Restart: ${restart}`);
     console.log('\nItems:');
 
     const disabled = new Set(config.disabledItems || []);

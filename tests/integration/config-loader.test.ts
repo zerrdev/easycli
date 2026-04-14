@@ -532,5 +532,77 @@ groups:
       assert.strictEqual(loader.getGroup('restart-no').config.restart, 'no');
       assert.strictEqual(loader.getGroup('restart-unless-stopped').config.restart, 'unless-stopped');
     });
+
+    it('should inherit restart from tool when group has no restart', () => {
+      const configContent = `
+tools:
+  docker:
+    cmd: docker run
+    restart: yes
+
+groups:
+  web:
+    tool: docker
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('web');
+
+      assert.strictEqual(result.config.restart, undefined);
+      assert.strictEqual(result.restart, 'yes');
+      assert.strictEqual(loader.getEffectiveRestart('web'), 'yes');
+    });
+
+    it('should allow group restart to override tool restart', () => {
+      const configContent = `
+tools:
+  docker:
+    cmd: docker run
+    restart: yes
+
+groups:
+  web:
+    tool: docker
+    restart: no
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('web');
+
+      assert.strictEqual(result.config.restart, 'no');
+      assert.strictEqual(result.restart, 'no');
+      assert.strictEqual(loader.getEffectiveRestart('web'), 'no');
+    });
+
+    it('should return undefined restart when neither group nor tool defines it', () => {
+      const configContent = `
+tools:
+  docker:
+    cmd: docker run
+
+groups:
+  web:
+    tool: docker
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('web');
+
+      assert.strictEqual(result.config.restart, undefined);
+      assert.strictEqual(result.restart, undefined);
+      assert.strictEqual(loader.getEffectiveRestart('web'), undefined);
+    });
   });
 });

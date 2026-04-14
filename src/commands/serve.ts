@@ -69,7 +69,7 @@ export async function serveCommand(portArg?: string): Promise<number> {
         const groups = Object.entries(config.groups).map(([name, group]) => ({
           name,
           tool: group.tool,
-          restart: group.restart,
+          restart: loader.getEffectiveRestart(name),
           items: Object.entries(group.items || {}).map(([itemName, value]) => ({
             name: itemName,
             value,
@@ -119,11 +119,11 @@ export async function serveCommand(portArg?: string): Promise<number> {
         const { enabled } = parsed;
         try {
           if (enabled) {
-            const { config, items, tool, toolTemplate, params } = loader.getGroup(groupName);
+            const { items, tool, toolTemplate, params, restart } = loader.getGroup(groupName);
             const processItems = items.map((item, index) =>
               TemplateExpander.parseItem(tool, toolTemplate, item, index, params)
             );
-            manager.spawnGroup(groupName, processItems, config.restart);
+            manager.spawnGroup(groupName, processItems, restart);
           } else {
             await manager.killGroup(groupName);
           }
@@ -159,11 +159,11 @@ export async function serveCommand(portArg?: string): Promise<number> {
           loader.toggleItem(groupName, itemName, enabled);
 
           if (manager.isGroupRunning(groupName)) {
-            const { config, items, tool, toolTemplate, params } = loader.getGroup(groupName);
+            const { items, tool, toolTemplate, params, restart } = loader.getGroup(groupName);
             const processItems = items.map((item, index) =>
               TemplateExpander.parseItem(tool, toolTemplate, item, index, params)
             );
-            await manager.restartGroup(groupName, processItems, config.restart);
+            await manager.restartGroup(groupName, processItems, restart);
           }
 
           res.setHeader('Content-Type', 'application/json');

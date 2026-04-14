@@ -13,7 +13,7 @@ export async function upCommand(groupName: string): Promise<number> {
     await pidStore.cleanupStalePids();
 
     // Load group config
-    const { config, items, tool, toolTemplate, params } = loader.getGroup(groupName);
+    const { config, items, tool, toolTemplate, params, restart } = loader.getGroup(groupName);
 
     // Build process items
     const processItems = items.map((item, index) =>
@@ -21,7 +21,7 @@ export async function upCommand(groupName: string): Promise<number> {
     );
 
     // Spawn all processes
-    manager.spawnGroup(groupName, processItems, config.restart);
+    manager.spawnGroup(groupName, processItems, restart);
 
     console.log(`Started group ${groupName} with ${processItems.length} process(es)`);
     console.log('Press Ctrl+C to stop...');

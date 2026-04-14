@@ -28,7 +28,7 @@ export async function groupsCommand(verbose: boolean): Promise<number> {
         details.push({
           name,
           tool: group.tool || '(none)',
-          restart: group.restart || '(none)',
+          restart: loader.getEffectiveRestart(name) || '(none)',
           itemCount: Object.keys(group.items || {}).length,
         });
       }

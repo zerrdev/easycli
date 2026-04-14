@@ -147,7 +147,7 @@ export class ConfigLoader {
     }));
   }
 
-  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; tool: string | null; toolTemplate: string | null; params: Record<string, string> } {
+  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart'] } {
     const config = this.load();
     const group = config.groups[name];
 
@@ -178,8 +178,21 @@ export class ConfigLoader {
     }
 
     const params = group.params || {};
+    const restart = group.restart ?? config.tools?.[group.tool]?.restart;
 
-    return { config: group, items, tool, toolTemplate, params };
+    return { config: group, items, tool, toolTemplate, params, restart };
+  }
+
+  getEffectiveRestart(groupName: string): GroupConfig['restart'] {
+    const config = this.load();
+    const group = config.groups[groupName];
+
+    if (!group) {
+      const available = Object.keys(config.groups).join(', ');
+      throw new ConfigError(`Unknown group: ${groupName}. Available: ${available}`);
+    }
+
+    return group.restart ?? (config.tools && config.tools[group.tool]?.restart) ?? undefined;
   }
 
   saveConfig(config: CliGrConfig): void {
