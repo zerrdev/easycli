@@ -75,4 +75,4 @@ No changes to `ProcessManager`, `PidStore`, `ConfigLoader`, or `TemplateExpander
 
 ## Concurrency Guard
 
-A `restarting` boolean prevents overlapping reload cycles. If a file change arrives while a restart is in progress, it's queued and processed after the current restart completes.
+A `restarting` boolean prevents overlapping reload cycles. If a file change arrives while a restart is in progress, the debounce timer resets as usual, but `handleFileChange()` exits early if `restarting` is true. The next debounce expiration (after the save burst settles) will find `restarting` false and proceed normally.
