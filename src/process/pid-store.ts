@@ -126,8 +126,9 @@ export class PidStore {
     try {
       await fs.unlink(filePath);
     } catch (err) {
-      // Ignore if file doesn't exist
-      if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      // Ignore if file doesn't exist or is still locked (Windows EPERM/EBUSY after taskkill)
+      const code = (err as NodeJS.ErrnoException).code;
+      if (code !== 'ENOENT' && code !== 'EPERM' && code !== 'EBUSY') {
         throw err;
       }
     }
