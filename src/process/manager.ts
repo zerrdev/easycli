@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, execSync, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import type { GroupConfig, ProcessItem } from '../config/types.js';
 import { PidStore, type PidEntry } from './pid-store.js';
@@ -246,26 +246,29 @@ export class ProcessManager extends EventEmitter {
 
   private killProcess(proc: ChildProcess): Promise<void> {
     return new Promise((resolve) => {
-      // First try SIGTERM for graceful shutdown
-      proc.kill('SIGTERM');
+      if (proc.exitCode !== null) {
+        resolve();
+        return;
+      }
 
-      // Force kill with SIGKILL after 5 seconds if still running
-      const timeout = setTimeout(() => {
-        if (!proc.killed) {
-          proc.kill('SIGKILL');
+      if (process.platform === 'win32' && proc.pid) {
+        try {
+          execSync(`taskkill /pid ${proc.pid} /T /F`, { windowsHide: true, stdio: 'pipe' });
+        } catch {
+          proc.kill('SIGTERM');
         }
+      } else {
+        proc.kill('SIGTERM');
+      }
+
+      const timeout = setTimeout(() => {
+        try { proc.kill('SIGKILL'); } catch { /* already dead */ }
       }, 10000);
 
       proc.on('exit', () => {
         clearTimeout(timeout);
         resolve();
       });
-
-      // If already dead, resolve immediately
-      if (proc.exitCode !== null) {
-        clearTimeout(timeout);
-        resolve();
-      }
     });
   }
 

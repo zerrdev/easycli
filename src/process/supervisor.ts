@@ -76,6 +76,7 @@ export class Supervisor {
       console.log('[watch] Config changed, restarting group...');
 
       await this.processManager.killGroup(this.groupName);
+      console.log('[watch] Old processes stopped');
 
       let retryCount = 0;
       const maxRetries = 1;
