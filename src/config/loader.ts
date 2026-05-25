@@ -36,6 +36,10 @@ export class ConfigLoader {
     }
   }
 
+  getConfigPath(): string {
+    return this.configPath;
+  }
+
   load(): CliGrConfig {
     if (!fs.existsSync(this.configPath)) {
       throw new ConfigError(
