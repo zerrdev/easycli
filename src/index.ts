@@ -69,7 +69,13 @@ async function main(): Promise<void> {
     process.exit(exitCode);
   } else {
     // Treat as a group name - run up command
-    const exitCode = await upCommand(firstArg);
+    const watchIndex = rest.indexOf('--watch');
+    const watch = watchIndex !== -1;
+    if (watch) {
+      rest.splice(watchIndex, 1);
+    }
+
+    const exitCode = await upCommand(firstArg, { watch });
     process.exit(exitCode);
   }
 }
@@ -86,9 +92,11 @@ Commands:
 
 Options:
   -v, --verbose       Show detailed group information
+  --watch             Watch config file for changes and auto-restart
 
 Examples:
   cligr test1         Start all processes in test1 group
+  cligr test1 --watch Start with config hot-reload
   cligr config
   cligr ls test1
   cligr groups
