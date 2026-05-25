@@ -260,7 +260,7 @@ export class ProcessManager extends EventEmitter {
         if (!proc.killed) {
           proc.kill('SIGKILL');
         }
-      }, 5000);
+      }, 10000);
 
       proc.on('exit', () => {
         clearTimeout(timeout);
@@ -268,7 +268,7 @@ export class ProcessManager extends EventEmitter {
       });
 
       // If already dead, resolve immediately
-      if (proc.killed || proc.exitCode !== null) {
+      if (proc.exitCode !== null) {
         clearTimeout(timeout);
         resolve();
       }
