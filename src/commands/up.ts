@@ -2,8 +2,13 @@ import { ConfigLoader } from '../config/loader.js';
 import { TemplateExpander } from '../process/template.js';
 import { ProcessManager } from '../process/manager.js';
 import { PidStore } from '../process/pid-store.js';
+import { Supervisor } from '../process/supervisor.js';
 
-export async function upCommand(groupName: string): Promise<number> {
+export interface UpOptions {
+  watch?: boolean;
+}
+
+export async function upCommand(groupName: string, options?: UpOptions): Promise<number> {
   const loader = new ConfigLoader();
   const manager = new ProcessManager();
   const pidStore = new PidStore();
@@ -12,7 +17,28 @@ export async function upCommand(groupName: string): Promise<number> {
     // Clean up any stale PID files for this group on startup
     await pidStore.cleanupStalePids();
 
-    // Load group config
+    if (options?.watch) {
+      const supervisor = new Supervisor(manager, loader, groupName);
+
+      supervisor.start();
+      console.log(`Started group ${groupName} (watch mode)`);
+      console.log('Press Ctrl+C to stop...');
+
+      return new Promise((resolve) => {
+        const cleanup = async () => {
+          console.log('\nShutting down...');
+          process.removeListener('SIGINT', cleanup);
+          process.removeListener('SIGTERM', cleanup);
+          await supervisor.stop();
+          resolve(0);
+        };
+
+        process.on('SIGINT', cleanup);
+        process.on('SIGTERM', cleanup);
+      });
+    }
+
+    // Default (non-watch) behavior
     const { config, items, tool, toolTemplate, params, restart } = loader.getGroup(groupName);
 
     // Build process items
