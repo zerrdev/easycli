@@ -151,7 +151,7 @@ export class ConfigLoader {
     }));
   }
 
-  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart'] } {
+  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; disabledNames: string[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart'] } {
     const config = this.load();
     const group = config.groups[name];
 
@@ -160,14 +160,11 @@ export class ConfigLoader {
       throw new ConfigError(`Unknown group: ${name}. Available: ${available}`);
     }
 
+    // Disabled items are returned alongside the rest, in config order, so the
+    // caller can list them as stopped and start them without a config edit.
+    const items = this.normalizeItems(group.items || {});
     const disabled = new Set(group.disabledItems || []);
-    const enabledItems: Record<string, string> = {};
-    for (const [name, value] of Object.entries(group.items || {})) {
-      if (!disabled.has(name)) {
-        enabledItems[name] = value;
-      }
-    }
-    const items = this.normalizeItems(enabledItems);
+    const disabledNames = items.filter(i => disabled.has(i.name)).map(i => i.name);
 
     // Resolve tool
     let toolTemplate: string | null = null;
@@ -184,7 +181,7 @@ export class ConfigLoader {
     const params = group.params || {};
     const restart = group.restart ?? config.tools?.[group.tool]?.restart;
 
-    return { config: group, items, tool, toolTemplate, params, restart };
+    return { config: group, items, disabledNames, tool, toolTemplate, params, restart };
   }
 
   getEffectiveRestart(groupName: string): GroupConfig['restart'] {

@@ -478,15 +478,19 @@ describe('ProcessManager Integration Tests', () => {
 
       let restartedGroup = '';
       let restartedItem = '';
-      manager.once('item-restarted', (groupName, itemName) => {
-        restartedGroup = groupName;
-        restartedItem = itemName;
+      // Waiting on the event rather than a fixed sleep, so the assertion does
+      // not race the 1s restart delay when the machine is busy.
+      const restarted = new Promise<void>(resolve => {
+        manager.once('item-restarted', (groupName: string, itemName: string) => {
+          restartedGroup = groupName;
+          restartedItem = itemName;
+          resolve();
+        });
       });
 
       manager.spawnGroup('restart-event-group', items, 'yes');
 
-      // Wait for the process to exit and restart (1-second delay + margin)
-      await new Promise(resolve => setTimeout(resolve, 2500));
+      await restarted;
 
       assert.strictEqual(restartedGroup, 'restart-event-group');
       assert.strictEqual(restartedItem, 'quick-exit');

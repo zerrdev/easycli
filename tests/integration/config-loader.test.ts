@@ -378,8 +378,10 @@ groups:
     });
   });
 
-  describe('disabledItems filtering', () => {
-    it('should filter disabled items from getGroup result', () => {
+  describe('disabledItems', () => {
+    // Disabled items are listed rather than dropped, so the dashboard can show
+    // them as stopped and the user can start them without editing the config.
+    it('should return disabled items alongside enabled ones, in config order', () => {
       const configContent = `
 groups:
   test1:
@@ -396,12 +398,31 @@ groups:
       const loader = new ConfigLoader();
       const result = loader.getGroup('test1');
 
-      assert.strictEqual(result.items.length, 1);
-      assert.strictEqual(result.items[0].name, 'world');
+      assert.deepStrictEqual(result.items.map(i => i.name), ['hello', 'world']);
       assert.strictEqual(result.config.disabledItems?.length, 1);
     });
 
-    it('should include all items when disabledItems is empty', () => {
+    it('should report which item names are disabled', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    disabledItems:
+      - hello
+    items:
+      hello: hello
+      world: world
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('test1');
+
+      assert.deepStrictEqual(result.disabledNames, ['hello']);
+    });
+
+    it('should report no disabled names when disabledItems is empty', () => {
       const configContent = `
 groups:
   test1:
@@ -418,6 +439,24 @@ groups:
       const result = loader.getGroup('test1');
 
       assert.strictEqual(result.items.length, 2);
+      assert.deepStrictEqual(result.disabledNames, []);
+    });
+
+    it('should report no disabled names when the key is absent', () => {
+      const configContent = `
+groups:
+  test1:
+    tool: echo
+    restart: no
+    items:
+      hello: hello
+`;
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+      const result = loader.getGroup('test1');
+
+      assert.deepStrictEqual(result.disabledNames, []);
     });
   });
 

@@ -3,31 +3,81 @@ import { EventEmitter } from 'events';
 import type { GroupConfig, ProcessItem } from '../config/types.js';
 import { PidStore, type PidEntry } from './pid-store.js';
 
-export type ProcessStatus = 'running' | 'stopped' | 'failed';
+export type ProcessStatus = 'running' | 'restarting' | 'stopped' | 'crashed';
+
+export interface ItemStatus {
+  name: string;
+  status: ProcessStatus;
+  pid: number | null;
+  startedAt: number | null;
+  restartCount: number;
+  lastExitCode: number | null;
+  command: string;
+}
 
 export class ManagedProcess {
+  public manuallyStopped = false;
+  public startedAt: number | null = null;
+  public lastExitCode: number | null = null;
+
   constructor(
     public item: ProcessItem,
-    public process: ChildProcess,
+    public process: ChildProcess | null,
     public status: ProcessStatus = 'running'
-  ) {}
+  ) {
+    this.startedAt = process ? Date.now() : null;
+    // An item with no process was never started, which is the same intent a
+    // manual stop expresses: stay down until asked otherwise.
+    this.manuallyStopped = process === null;
+  }
 }
 
 export class ProcessManager extends EventEmitter {
   private groups = new Map<string, ManagedProcess[]>();
+  private restartPolicies = new Map<string, GroupConfig['restart']>();
+  private groupStartedAt = new Map<string, number>();
   private restartTimestamps = new Map<string, number[]>();
+  private restartTimers = new Map<string, NodeJS.Timeout>();
   private readonly maxRestarts = 3;
   private readonly restartWindow = 10000; // 10 seconds
+  private readonly restartDelay = 1000;
   private readonly pidStore = new PidStore();
 
-  spawnGroup(groupName: string, items: ProcessItem[], restartPolicy: GroupConfig['restart']): void {
+  /**
+   * The dashboard puts the parent terminal in raw mode, so children must not
+   * share that stdin or the two compete for keystrokes.
+   */
+  readonly childStdin: 'inherit' | 'ignore';
+
+  constructor(options: { childStdin?: 'inherit' | 'ignore' } = {}) {
+    super();
+    this.childStdin = options.childStdin ?? 'inherit';
+  }
+
+  spawnGroup(
+    groupName: string,
+    items: ProcessItem[],
+    restartPolicy: GroupConfig['restart'],
+    disabledNames: string[] = []
+  ): void {
     if (this.groups.has(groupName)) {
       throw new Error(`Group ${groupName} is already running`);
     }
 
     const processes: ManagedProcess[] = [];
+    const disabled = new Set(disabledNames);
+
+    this.restartPolicies.set(groupName, restartPolicy);
+    this.groupStartedAt.set(groupName, Date.now());
 
     for (const item of items) {
+      // Disabled items are tracked so they can be listed and started later,
+      // but nothing is spawned for them now.
+      if (disabled.has(item.name)) {
+        processes.push(new ManagedProcess(item, null, 'stopped'));
+        continue;
+      }
+
       const proc = this.spawnProcess(item, groupName, restartPolicy);
       processes.push(new ManagedProcess(item, proc));
     }
@@ -48,7 +98,7 @@ export class ProcessManager extends EventEmitter {
     const { cmd, args } = this.parseCommand(item.fullCmd);
 
     const proc = spawn(cmd, args, {
-      stdio: ['inherit', 'pipe', 'pipe'],
+      stdio: [this.childStdin, 'pipe', 'pipe'],
       // On Windows, don't use shell to avoid PID mismatch
       // The shell's PID would be stored instead of the actual process
       // For commands that need shell, user should use cmd /c prefix
@@ -87,17 +137,11 @@ export class ProcessManager extends EventEmitter {
     };
 
     if (proc.stdout) {
-      proc.stdout.on('data', (data) => {
-        process.stdout.write(`[${item.name}] ${data}`);
-        emitLines(data, false);
-      });
+      proc.stdout.on('data', (data) => emitLines(data, false));
     }
 
     if (proc.stderr) {
-      proc.stderr.on('data', (data) => {
-        process.stderr.write(`[${item.name}] ${data}`);
-        emitLines(data, true);
-      });
+      proc.stderr.on('data', (data) => emitLines(data, true));
     }
 
     // Handle exit and restart
@@ -105,7 +149,29 @@ export class ProcessManager extends EventEmitter {
       this.handleExit(groupName, item, restartPolicy, code, signal);
     });
 
+    if (proc.pid) {
+      this.emit('item-spawned', groupName, item.name, proc.pid);
+    }
+
     return proc;
+  }
+
+  private findManaged(groupName: string, itemName: string): ManagedProcess | undefined {
+    return this.groups.get(groupName)?.find(mp => mp.item.name === itemName);
+  }
+
+  private requireManaged(groupName: string, itemName: string): ManagedProcess {
+    const managed = this.findManaged(groupName, itemName);
+    if (!managed) {
+      throw new Error(`Item ${itemName} not found in group ${groupName}`);
+    }
+    return managed;
+  }
+
+  private recentRestarts(groupName: string, itemName: string): number {
+    const timestamps = this.restartTimestamps.get(`${groupName}-${itemName}`) || [];
+    const now = Date.now();
+    return timestamps.filter(ts => now - ts < this.restartWindow).length;
   }
 
   private parseCommand(fullCmd: string): { cmd: string; args: string[] } {
@@ -152,8 +218,23 @@ export class ProcessManager extends EventEmitter {
       return;
     }
 
+    const managed = this.findManaged(groupName, item.name);
+    if (managed) {
+      managed.lastExitCode = code;
+    }
+
+    this.emit('item-exited', groupName, item.name, code, signal);
+
+    // A manual stop suppresses the restart policy entirely, otherwise the item
+    // the user just stopped would come straight back.
+    if (managed?.manuallyStopped) {
+      this.pidStore.deletePid(groupName, item.name).catch(() => {});
+      return;
+    }
+
     // Check restart policy
     if (restartPolicy === 'no') {
+      if (managed) managed.status = 'stopped';
       // Clean up PID file when not restarting
       this.pidStore.deletePid(groupName, item.name).catch(() => {});
       return;
@@ -170,34 +251,130 @@ export class ProcessManager extends EventEmitter {
     this.restartTimestamps.set(key, recentTimestamps);
 
     if (recentTimestamps.length > this.maxRestarts) {
-      console.error(`[${item.name}] Crash loop detected. Stopping restarts.`);
+      if (managed) managed.status = 'crashed';
       // Clean up PID file when stopping due to crash loop
       this.pidStore.deletePid(groupName, item.name).catch(() => {});
+      this.emit('item-crash-looped', groupName, item.name);
       return;
     }
 
-    // Restart after delay
-    setTimeout(() => {
-      console.log(`[${item.name}] Restarting... (exit code: ${code})`);
-      const newProc = this.spawnProcess(item, groupName, restartPolicy);
-      this.emit('item-restarted', groupName, item.name);
+    if (managed) managed.status = 'restarting';
+    this.emit('item-restarting', groupName, item.name, this.restartDelay, recentTimestamps.length);
 
-      // Update the ManagedProcess in the groups Map with the new process handle
-      const processes = this.groups.get(groupName);
-      if (processes) {
-        const managedProc = processes.find(mp => mp.item.name === item.name);
-        if (managedProc) {
-          managedProc.process = newProc;
-        }
+    // Restart after delay
+    const timer = setTimeout(() => {
+      this.restartTimers.delete(key);
+
+      // The group may have been killed while the restart was pending.
+      const target = this.findManaged(groupName, item.name);
+      if (!target || target.manuallyStopped) {
+        return;
       }
-    }, 1000);
+
+      const newProc = this.spawnProcess(item, groupName, restartPolicy);
+      target.process = newProc;
+      target.status = 'running';
+      target.startedAt = Date.now();
+
+      this.emit('item-restarted', groupName, item.name);
+    }, this.restartDelay);
+
+    this.restartTimers.set(key, timer);
+  }
+
+  /**
+   * Drops a scheduled respawn. Without this a stop/start inside the restart
+   * delay lets the old timer fire and spawn a second process on top of the
+   * live one.
+   */
+  private cancelPendingRestart(groupName: string, itemName: string): void {
+    const key = `${groupName}-${itemName}`;
+    const timer = this.restartTimers.get(key);
+    if (timer) {
+      clearTimeout(timer);
+      this.restartTimers.delete(key);
+    }
+  }
+
+  async restartItem(groupName: string, itemName: string): Promise<void> {
+    this.requireManaged(groupName, itemName);
+
+    // A crashed item gets a genuine fresh start rather than tripping the
+    // crash-loop threshold again on its first exit.
+    this.restartTimestamps.delete(`${groupName}-${itemName}`);
+
+    await this.stopItem(groupName, itemName);
+    this.startItem(groupName, itemName);
+  }
+
+  async stopItem(groupName: string, itemName: string): Promise<void> {
+    const managed = this.requireManaged(groupName, itemName);
+
+    this.cancelPendingRestart(groupName, itemName);
+
+    // Set before killing so handleExit sees it and skips the restart policy.
+    managed.manuallyStopped = true;
+
+    if (managed.process) {
+      await this.killProcess(managed.process);
+    }
+
+    managed.status = 'stopped';
+    managed.startedAt = null;
+    await this.pidStore.deletePid(groupName, itemName).catch(() => {});
+
+    this.emit('item-stopped', groupName, itemName);
+  }
+
+  startItem(groupName: string, itemName: string): void {
+    const managed = this.requireManaged(groupName, itemName);
+
+    if (managed.status === 'running') {
+      return;
+    }
+
+    this.cancelPendingRestart(groupName, itemName);
+    managed.manuallyStopped = false;
+    managed.process = this.spawnProcess(managed.item, groupName, this.restartPolicies.get(groupName));
+    managed.status = 'running';
+    managed.startedAt = Date.now();
+  }
+
+  /** When the group was spawned. Restarting individual items does not reset it. */
+  getGroupStartedAt(groupName: string): number | null {
+    return this.groups.has(groupName) ? this.groupStartedAt.get(groupName) ?? null : null;
+  }
+
+  getGroupItems(groupName: string): ItemStatus[] {
+    const processes = this.groups.get(groupName);
+    if (!processes) return [];
+
+    return processes.map(mp => ({
+      name: mp.item.name,
+      status: mp.status,
+      pid: mp.status === 'running' ? mp.process?.pid ?? null : null,
+      startedAt: mp.startedAt,
+      restartCount: this.recentRestarts(groupName, mp.item.name),
+      lastExitCode: mp.lastExitCode,
+      command: mp.item.fullCmd
+    }));
   }
 
   killGroup(groupName: string): Promise<void> {
     const processes = this.groups.get(groupName);
     if (!processes) return Promise.resolve();
 
-    const killPromises = processes.map(mp => this.killProcess(mp.process));
+    for (const mp of processes) {
+      this.cancelPendingRestart(groupName, mp.item.name);
+    }
+
+    // Each item reports as it goes down so callers can show shutdown progress;
+    // killing a group is not instant.
+    const killPromises = processes.map(mp =>
+      (mp.process ? this.killProcess(mp.process) : Promise.resolve()).then(() => {
+        this.emit('item-killed', groupName, mp.item.name);
+      })
+    );
 
     this.groups.delete(groupName);
 

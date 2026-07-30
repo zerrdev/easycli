@@ -22,7 +22,7 @@ async function buildSourceModules() {
   console.log('Building source modules...');
 
   // Build source modules directly to src directory (as .js files alongside .ts)
-  const dirs = ['config', 'process', 'commands'];
+  const dirs = ['config', 'process', 'commands', 'ui', 'cli'];
 
   for (const dir of dirs) {
     const dirPath = path.join(SRC_DIR, dir);
@@ -123,7 +123,7 @@ function runTests(verbose = false) {
 
 async function cleanupSourceModules() {
   // Remove generated .js files from src directory
-  const dirs = ['config', 'process', 'commands'];
+  const dirs = ['config', 'process', 'commands', 'ui', 'cli'];
 
   for (const dir of dirs) {
     const dirPath = path.join(SRC_DIR, dir);
