@@ -2,13 +2,16 @@ export interface CliFlags {
   verbose: boolean;
   noUi: boolean;
   ascii: boolean;
+  help: boolean;
 }
 
 const FLAG_ALIASES: Record<string, keyof CliFlags> = {
   '-v': 'verbose',
   '--verbose': 'verbose',
   '--no-ui': 'noUi',
-  '--ascii': 'ascii'
+  '--ascii': 'ascii',
+  '-h': 'help',
+  '--help': 'help'
 };
 
 /**
@@ -16,7 +19,7 @@ const FLAG_ALIASES: Record<string, keyof CliFlags> = {
  * positional arguments, regardless of where the flags were typed.
  */
 export function parseFlags(args: string[]): { flags: CliFlags; rest: string[] } {
-  const flags: CliFlags = { verbose: false, noUi: false, ascii: false };
+  const flags: CliFlags = { verbose: false, noUi: false, ascii: false, help: false };
   const rest: string[] = [];
 
   for (const arg of args) {

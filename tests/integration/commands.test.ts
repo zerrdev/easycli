@@ -15,6 +15,8 @@ import os from 'node:os';
 import { upCommand } from '../../src/commands/up.js';
 import { lsCommand } from '../../src/commands/ls.js';
 import { groupsCommand } from '../../src/commands/groups.js';
+import { CONFIG_TEMPLATE } from '../../src/commands/config.js';
+import { ConfigLoader } from '../../src/config/loader.js';
 
 describe('CLI Commands Integration Tests', () => {
   let testConfigDir: string;
@@ -273,6 +275,43 @@ ${groups}
 
       assert.strictEqual(exitCode, 0);
       assert.match(getErrorOutput(), /once-empty/);
+    });
+  });
+
+  describe('configCommand template', () => {
+    it('should ship a default template that loads without error', () => {
+      fs.writeFileSync(testConfigPath, CONFIG_TEMPLATE);
+
+      const loader = new ConfigLoader();
+
+      assert.doesNotThrow(() => loader.load());
+    });
+
+    it('should ship a default template whose groups all resolve', () => {
+      fs.writeFileSync(testConfigPath, CONFIG_TEMPLATE);
+
+      const loader = new ConfigLoader();
+      const groupNames = loader.listGroups();
+
+      assert.ok(groupNames.length > 0, 'template should define groups');
+      for (const name of groupNames) {
+        assert.doesNotThrow(() => loader.getGroup(name), `group ${name} must resolve`);
+      }
+    });
+
+    it('should ship a default template using valid restart policies', () => {
+      fs.writeFileSync(testConfigPath, CONFIG_TEMPLATE);
+
+      const loader = new ConfigLoader();
+
+      for (const name of loader.listGroups()) {
+        const restart = loader.getGroup(name).restart;
+        if (restart === undefined) continue;
+        assert.ok(
+          ['yes', 'no', 'unless-stopped'].includes(restart),
+          `group ${name} has invalid restart policy: ${JSON.stringify(restart)}`
+        );
+      }
     });
   });
 

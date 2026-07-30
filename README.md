@@ -38,26 +38,63 @@ groups:
     tool: kubefwd
     restart: yes
     items:
-      - service1,8080,80
-      - service2,8081,80
+      service1: "service1,8080,80"
+      service2: "service2,8081,80"
 ```
 
 **Syntax:**
-- Items are comma-separated: `"name,arg2,arg3"`
-- `$1` = name (first value)
-- `$2`, `$3`... = additional arguments
-- If no `tool` specified, executes directly
+- Each item is a name and a comma-separated value: `itemName: "value1,value2"`
+- `$1` = first value, `$2`, `$3`... = the rest
+- Item names must be unique within a group, and are what `ls` and the dashboard show
+- If no `tool` is specified, the item value runs directly
+
+Named parameters work too, and apply to every item in the group:
+
+```yaml
+groups:
+  myapp:
+    tool: kubefwd
+    params:
+      namespace: staging
+    items:
+      service1: "service1,8080,80"
+```
+
+Items can be disabled without deleting them:
+
+```yaml
+groups:
+  myapp:
+    tool: kubefwd
+    disabledItems:
+      - service2
+    items:
+      service1: "service1,8080,80"
+      service2: "service2,8081,80"
+```
 
 ## Usage
 
 ```bash
-cligr config              # Open config file in editor
+cligr <group>             # Start the group (shorthand for: cligr up <group>)
 cligr up <group>          # Start all processes in group
 cligr ls <group>          # List group items
-cligr down <group>        # Stop group (Ctrl+C also works)
 cligr groups              # List all groups
 cligr groups -v           # List groups with details
+cligr config              # Open config file in editor
+cligr --help              # Show help
 ```
+
+Press Ctrl+C to stop a running group.
+
+**Options:**
+
+| Flag | Effect |
+| --- | --- |
+| `-v`, `--verbose` | Show detailed group information (`groups`) |
+| `--no-ui` | Disable the status dashboard, stream plain prefixed logs |
+| `--ascii` | Use ASCII instead of Unicode in the dashboard |
+| `-h`, `--help` | Show help |
 
 ## Restart Policies
 

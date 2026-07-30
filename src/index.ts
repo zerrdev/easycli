@@ -5,6 +5,7 @@ import { lsCommand } from './commands/ls.js';
 import { configCommand } from './commands/config.js';
 import { groupsCommand } from './commands/groups.js';
 import { parseFlags } from './cli/flags.js';
+import { printUsage } from './cli/usage.js';
 
 const KNOWN_COMMANDS = ['config', 'up', 'ls', 'groups'];
 
@@ -12,6 +13,12 @@ async function main(): Promise<void> {
   // Flags are stripped up front so every branch below sees only positional
   // arguments, regardless of where the flags were typed.
   const { flags, rest: args } = parseFlags(process.argv.slice(2));
+
+  // Asking for help is never an error, so it exits 0 unlike a bare invocation.
+  if (flags.help) {
+    printUsage();
+    process.exit(0);
+  }
 
   if (args.length === 0) {
     printUsage();
@@ -54,30 +61,6 @@ async function main(): Promise<void> {
   }
 
   process.exit(exitCode);
-}
-
-function printUsage(): void {
-  console.log(`
-Usage: cligr <group> | <command> [options]
-
-Commands:
-  config              Open config file in editor
-  ls <group>          List all items in the group
-  groups [-v|--verbose]   List all groups
-
-Options:
-  -v, --verbose       Show detailed group information
-  --no-ui             Disable the status dashboard, stream plain logs
-  --ascii             Use ASCII instead of Unicode in the dashboard
-
-Examples:
-  cligr test1         Start all processes in test1 group
-  cligr test1 --ascii Start with an ASCII-only dashboard
-  cligr config
-  cligr ls test1
-  cligr groups
-  cligr groups -v
-`);
 }
 
 main().catch((err) => {

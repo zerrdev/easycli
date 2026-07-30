@@ -5,6 +5,7 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
 import { parseFlags } from '../../src/cli/flags.js';
+import { usageText } from '../../src/cli/usage.js';
 import { shouldUseDashboard, shouldUseColor } from '../../src/ui/activation.js';
 
 describe('parseFlags', () => {
@@ -70,6 +71,59 @@ describe('parseFlags', () => {
     const { rest } = parseFlags(['test1', '--unknown']);
 
     assert.deepStrictEqual(rest, ['test1', '--unknown']);
+  });
+
+  it('should default help to false', () => {
+    const { flags } = parseFlags(['groups']);
+
+    assert.strictEqual(flags.help, false);
+  });
+
+  it('should extract --help', () => {
+    const { flags, rest } = parseFlags(['--help']);
+
+    assert.strictEqual(flags.help, true);
+    assert.deepStrictEqual(rest, []);
+  });
+
+  it('should extract -h', () => {
+    const { flags, rest } = parseFlags(['-h']);
+
+    assert.strictEqual(flags.help, true);
+    assert.deepStrictEqual(rest, []);
+  });
+
+  it('should extract --help alongside a group name', () => {
+    const { flags, rest } = parseFlags(['up', 'test1', '--help']);
+
+    assert.strictEqual(flags.help, true);
+    assert.deepStrictEqual(rest, ['up', 'test1']);
+  });
+});
+
+describe('usageText', () => {
+  it('should document every command the CLI accepts', () => {
+    for (const command of ['config', 'up', 'ls', 'groups']) {
+      assert.match(usageText(), new RegExp(`\\b${command}\\b`));
+    }
+  });
+
+  it('should document every flag the CLI accepts', () => {
+    for (const flag of ['--verbose', '--no-ui', '--ascii', '--help']) {
+      assert.ok(usageText().includes(flag), `usage should mention ${flag}`);
+    }
+  });
+
+  it('should not document commands that do not exist', () => {
+    // `down` was documented for a long time without ever being implemented.
+    assert.ok(
+      !/\bdown\b/.test(usageText()),
+      'usage must not advertise a down command'
+    );
+  });
+
+  it('should mention that a bare group name starts that group', () => {
+    assert.match(usageText(), /cligr <group>/);
   });
 });
 

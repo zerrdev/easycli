@@ -4,32 +4,42 @@ import os from 'os';
 import path from 'path';
 
 const CONFIG_FILENAME = '.cligr.yml';
-const TEMPLATE = `# Cligr Configuration
+export const CONFIG_TEMPLATE = `# Cligr Configuration
 
 groups:
   web:
     tool: docker
-    restart: false
+    restart: no
     items:
-      - "nginx,8080"      # $1=nginx (name), $2=8080 (port)
-      - "nginx,3000"
+      nginx8080: "nginx,8080"    # $1=nginx, $2=8080
+      nginx3000: "nginx,3000"
 
   simple:
     tool: node
     items:
-      - "server"          # $1=server (name only)
+      server: "server"           # $1=server
+
+  # A one-shot group: runs, prints its output, and exits.
+  nav-stg:
+    tool: kubectx
+    mode: once
+    items:
+      ctx: "staging"
 
 tools:
   docker:
-    cmd: "docker run -p $2:$2 nginx"   # $1=name, $2=port
+    cmd: "docker run -p $2:$2 nginx"    # $1=name, $2=port
   node:
-    cmd: "node $1.js"                   # $1=file name
+    cmd: "node $1.js"                    # $1=file name
+  kubectx:
+    cmd: "kubectl config use-context $1"
 
 # Syntax:
-# - Items are comma-separated: "name,arg2,arg3"
-# - $1 = name (first value)
-# - $2, $3... = additional arguments
-# - If no tool specified, executes directly
+# - Items are named: itemName: "value1,value2"
+# - $1 = first value, $2, $3... = the rest
+# - If no tool is specified, the item value runs directly
+# - restart: yes | no | unless-stopped
+# - mode: once runs the group to completion and exits instead of supervising it
 `;
 
 function detectEditor(): string {
@@ -85,7 +95,7 @@ function createTemplate(filePath: string): void {
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
-  fs.writeFileSync(filePath, TEMPLATE, 'utf-8');
+  fs.writeFileSync(filePath, CONFIG_TEMPLATE, 'utf-8');
 }
 
 export async function configCommand(): Promise<number> {
