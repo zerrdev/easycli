@@ -1,7 +1,9 @@
 import { ConfigLoader } from '../config/loader.js';
+import type { ProcessItem } from '../config/types.js';
 import { TemplateExpander } from '../process/template.js';
 import { ProcessManager } from '../process/manager.js';
 import { PidStore } from '../process/pid-store.js';
+import { runOnce } from '../process/one-shot.js';
 import { Dashboard } from '../ui/dashboard.js';
 import { PlainLogger } from '../ui/plain-logger.js';
 import { ShutdownView } from '../ui/shutdown.js';
@@ -15,17 +17,22 @@ export interface UpOptions {
 
 export async function upCommand(groupName: string, options: UpOptions = {}): Promise<number> {
   const loader = new ConfigLoader();
-  const pidStore = new PidStore();
 
   try {
-    // Clean up any stale PID files for this group on startup
-    await pidStore.cleanupStalePids();
-
-    const { items, disabledNames, tool, toolTemplate, params, restart } = loader.getGroup(groupName);
+    const { items, disabledNames, tool, toolTemplate, params, restart, mode, sequential } =
+      loader.getGroup(groupName);
 
     const processItems = items.map((item, index) =>
       TemplateExpander.parseItem(tool, toolTemplate, item, index, params)
     );
+
+    if (mode === 'once') {
+      return runOneShot(groupName, processItems, disabledNames, sequential);
+    }
+
+    // Only a supervised run tracks PIDs, so only it needs the stale sweep.
+    const pidStore = new PidStore();
+    await pidStore.cleanupStalePids();
 
     const useDashboard = shouldUseDashboard({
       isTTY: Boolean(process.stdout.isTTY),
@@ -53,6 +60,23 @@ export async function upCommand(groupName: string, options: UpOptions = {}): Pro
     }
     throw error;
   }
+}
+
+function runOneShot(
+  groupName: string,
+  processItems: ProcessItem[],
+  disabledNames: string[],
+  sequential: boolean
+): Promise<number> {
+  const disabled = new Set(disabledNames);
+  const enabled = processItems.filter(item => !disabled.has(item.name));
+
+  if (enabled.length === 0) {
+    console.error(`cligr: group ${groupName} has no enabled items`);
+    return Promise.resolve(0);
+  }
+
+  return runOnce({ items: enabled, sequential });
 }
 
 function runPlain(manager: ProcessManager, groupName: string): Promise<number> {

@@ -1,7 +1,8 @@
-import { spawn, execSync, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import type { GroupConfig, ProcessItem } from '../config/types.js';
 import { PidStore, type PidEntry } from './pid-store.js';
+import { parseCommand, killProcess } from './spawn-utils.js';
 
 export type ProcessStatus = 'running' | 'restarting' | 'stopped' | 'crashed';
 
@@ -95,7 +96,7 @@ export class ProcessManager extends EventEmitter {
 
   private spawnProcess(item: ProcessItem, groupName: string, restartPolicy: GroupConfig['restart']): ChildProcess {
     // Parse command into executable and args, handling quoted strings
-    const { cmd, args } = this.parseCommand(item.fullCmd);
+    const { cmd, args } = parseCommand(item.fullCmd);
 
     const proc = spawn(cmd, args, {
       stdio: [this.childStdin, 'pipe', 'pipe'],
@@ -172,40 +173,6 @@ export class ProcessManager extends EventEmitter {
     const timestamps = this.restartTimestamps.get(`${groupName}-${itemName}`) || [];
     const now = Date.now();
     return timestamps.filter(ts => now - ts < this.restartWindow).length;
-  }
-
-  private parseCommand(fullCmd: string): { cmd: string; args: string[] } {
-    // Handle quoted strings for Windows paths with spaces
-    const args: string[] = [];
-    let current = '';
-    let inQuote = false;
-    let quoteChar = '';
-
-    for (let i = 0; i < fullCmd.length; i++) {
-      const char = fullCmd[i];
-      const nextChar = fullCmd[i + 1];
-
-      if ((char === '"' || char === "'") && !inQuote) {
-        inQuote = true;
-        quoteChar = char;
-      } else if (char === quoteChar && inQuote) {
-        inQuote = false;
-        quoteChar = '';
-      } else if (char === ' ' && !inQuote) {
-        if (current) {
-          args.push(current);
-          current = '';
-        }
-      } else {
-        current += char;
-      }
-    }
-
-    if (current) {
-      args.push(current);
-    }
-
-    return { cmd: args[0] || '', args: args.slice(1) };
   }
 
   private handleExit(groupName: string, item: ProcessItem, restartPolicy: GroupConfig['restart'], code: number | null, signal: NodeJS.Signals | null): void {
@@ -316,7 +283,7 @@ export class ProcessManager extends EventEmitter {
     managed.manuallyStopped = true;
 
     if (managed.process) {
-      await this.killProcess(managed.process);
+      await killProcess(managed.process);
     }
 
     managed.status = 'stopped';
@@ -371,7 +338,7 @@ export class ProcessManager extends EventEmitter {
     // Each item reports as it goes down so callers can show shutdown progress;
     // killing a group is not instant.
     const killPromises = processes.map(mp =>
-      (mp.process ? this.killProcess(mp.process) : Promise.resolve()).then(() => {
+      (mp.process ? killProcess(mp.process) : Promise.resolve()).then(() => {
         this.emit('item-killed', groupName, mp.item.name);
       })
     );
@@ -418,34 +385,6 @@ export class ProcessManager extends EventEmitter {
       } catch (err) {
         reject(err);
       }
-    });
-  }
-
-  private killProcess(proc: ChildProcess): Promise<void> {
-    return new Promise((resolve) => {
-      if (proc.exitCode !== null) {
-        resolve();
-        return;
-      }
-
-      if (process.platform === 'win32' && proc.pid) {
-        try {
-          execSync(`taskkill /pid ${proc.pid} /T /F`, { windowsHide: true, stdio: 'pipe' });
-        } catch {
-          proc.kill('SIGTERM');
-        }
-      } else {
-        proc.kill('SIGTERM');
-      }
-
-      const timeout = setTimeout(() => {
-        try { proc.kill('SIGKILL'); } catch { /* already dead */ }
-      }, 10000);
-
-      proc.on('exit', () => {
-        clearTimeout(timeout);
-        resolve();
-      });
     });
   }
 

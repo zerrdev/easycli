@@ -1,6 +1,11 @@
+/** `once` runs a group's items to completion and exits instead of supervising them. */
+export type RunMode = 'monitor' | 'once';
+
 export interface ToolConfig {
   cmd: string;
   restart?: 'yes' | 'no' | 'unless-stopped';
+  mode?: RunMode;
+  sequential?: boolean;
 }
 
 export interface ItemEntry {
@@ -11,6 +16,8 @@ export interface ItemEntry {
 export interface GroupConfig {
   tool: string;
   restart?: 'yes' | 'no' | 'unless-stopped';
+  mode?: RunMode;
+  sequential?: boolean;
   params?: Record<string, string>;
   disabledItems?: string[];
   items?: Record<string, string>;

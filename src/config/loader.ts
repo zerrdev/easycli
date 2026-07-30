@@ -2,9 +2,10 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import yaml from 'js-yaml';
-import type { CliGrConfig, GroupConfig, ToolConfig, ItemEntry } from './types.js';
+import type { CliGrConfig, GroupConfig, ToolConfig, ItemEntry, RunMode } from './types.js';
 
 const CONFIG_FILENAME = '.cligr.yml';
+const RUN_MODES: RunMode[] = ['monitor', 'once'];
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -72,16 +73,39 @@ export class ConfigLoader {
       throw new ConfigError('Config must have a "groups" object');
     }
 
+    if (cfg.tools && typeof cfg.tools === 'object') {
+      for (const [toolName, tool] of Object.entries(cfg.tools as Record<string, unknown>)) {
+        if (tool && typeof tool === 'object') {
+          this.validateRunMode(tool as Record<string, unknown>, `Tool "${toolName}"`);
+        }
+      }
+    }
+
     // Validate each group's items
     for (const [groupName, group] of Object.entries(cfg.groups as Record<string, unknown>)) {
       if (group && typeof group === 'object') {
         const groupObj = group as Record<string, unknown>;
         this.validateItems(groupObj.items, groupName);
         this.validateDisabledItems(groupObj.items, groupObj.disabledItems, groupName);
+        this.validateRunMode(groupObj, `Group "${groupName}"`);
       }
     }
 
     return cfg as unknown as CliGrConfig;
+  }
+
+  private validateRunMode(entry: Record<string, unknown>, label: string): void {
+    const { mode, sequential } = entry;
+
+    if (mode !== undefined && !RUN_MODES.includes(mode as RunMode)) {
+      throw new ConfigError(
+        `${label}: mode must be one of ${RUN_MODES.join(', ')} (got "${String(mode)}")`
+      );
+    }
+
+    if (sequential !== undefined && typeof sequential !== 'boolean') {
+      throw new ConfigError(`${label}: sequential must be true or false`);
+    }
   }
 
   private validateItems(items: unknown, groupName: string): void {
@@ -151,7 +175,7 @@ export class ConfigLoader {
     }));
   }
 
-  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; disabledNames: string[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart'] } {
+  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; disabledNames: string[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart']; mode: RunMode; sequential: boolean } {
     const config = this.load();
     const group = config.groups[name];
 
@@ -179,9 +203,14 @@ export class ConfigLoader {
     }
 
     const params = group.params || {};
-    const restart = group.restart ?? config.tools?.[group.tool]?.restart;
+    const toolConfig: ToolConfig | undefined = config.tools?.[group.tool];
+    const restart = group.restart ?? toolConfig?.restart;
 
-    return { config: group, items, disabledNames, tool, toolTemplate, params, restart };
+    // Both settings resolve group-over-tool, the same way restart does.
+    const mode = group.mode ?? toolConfig?.mode ?? 'monitor';
+    const sequential = group.sequential ?? toolConfig?.sequential ?? false;
+
+    return { config: group, items, disabledNames, tool, toolTemplate, params, restart, mode, sequential };
   }
 
   getEffectiveRestart(groupName: string): GroupConfig['restart'] {
@@ -193,7 +222,7 @@ export class ConfigLoader {
       throw new ConfigError(`Unknown group: ${groupName}. Available: ${available}`);
     }
 
-    return group.restart ?? (config.tools && config.tools[group.tool]?.restart) ?? undefined;
+    return group.restart ?? config.tools?.[group.tool]?.restart;
   }
 
   saveConfig(config: CliGrConfig): void {

@@ -165,6 +165,174 @@ groups:
     });
   });
 
+  describe('upCommand with mode: once', () => {
+    // A tool template that runs an inline node script. Item values must not
+    // contain commas, which the template expander treats as argument separators.
+    const onceConfig = (groups: string) => `
+tools:
+  runner:
+    cmd: '"${process.execPath.split(path.sep).join('/')}" -e "$1"'
+    mode: once
+
+groups:
+${groups}
+`;
+
+    it('should return the exit code of the one-shot item', { timeout: 10000 }, async () => {
+      fs.writeFileSync(testConfigPath, onceConfig(`
+  once-fail:
+    tool: runner
+    items:
+      solo: process.exit(5)
+`));
+
+      resetOutput();
+      const exitCode = await upCommand('once-fail');
+
+      assert.strictEqual(exitCode, 5);
+    });
+
+    it('should return 0 when the one-shot item succeeds', { timeout: 10000 }, async () => {
+      fs.writeFileSync(testConfigPath, onceConfig(`
+  once-ok:
+    tool: runner
+    items:
+      solo: process.exit(0)
+`));
+
+      resetOutput();
+      const exitCode = await upCommand('once-ok');
+
+      assert.strictEqual(exitCode, 0);
+    });
+
+    it('should not print the supervised startup banner', { timeout: 10000 }, async () => {
+      fs.writeFileSync(testConfigPath, onceConfig(`
+  once-quiet:
+    tool: runner
+    items:
+      solo: process.exit(0)
+`));
+
+      resetOutput();
+      await upCommand('once-quiet');
+
+      assert.ok(
+        !getLogOutput().includes('Started group'),
+        `expected no startup banner, got ${JSON.stringify(getLogOutput())}`
+      );
+    });
+
+    it('should not write PID files', { timeout: 10000 }, async () => {
+      fs.writeFileSync(testConfigPath, onceConfig(`
+  once-nopid:
+    tool: runner
+    items:
+      solo: process.exit(0)
+`));
+
+      const pidsDir = path.join(testConfigDir, '.cligr', 'pids');
+      fs.rmSync(pidsDir, { recursive: true, force: true });
+
+      resetOutput();
+      await upCommand('once-nopid');
+
+      const written = fs.existsSync(pidsDir) ? fs.readdirSync(pidsDir) : [];
+      assert.deepStrictEqual(written, []);
+    });
+
+    it('should skip disabled items', { timeout: 10000 }, async () => {
+      fs.writeFileSync(testConfigPath, onceConfig(`
+  once-disabled:
+    tool: runner
+    disabledItems:
+      - broken
+    items:
+      broken: process.exit(9)
+      fine: process.exit(0)
+`));
+
+      resetOutput();
+      const exitCode = await upCommand('once-disabled');
+
+      assert.strictEqual(exitCode, 0);
+    });
+
+    it('should report when every item is disabled', { timeout: 10000 }, async () => {
+      fs.writeFileSync(testConfigPath, onceConfig(`
+  once-empty:
+    tool: runner
+    disabledItems:
+      - solo
+    items:
+      solo: process.exit(9)
+`));
+
+      resetOutput();
+      const exitCode = await upCommand('once-empty');
+
+      assert.strictEqual(exitCode, 0);
+      assert.match(getErrorOutput(), /once-empty/);
+    });
+  });
+
+  describe('lsCommand run mode', () => {
+    it('should show the mode for a one-shot group', async () => {
+      fs.writeFileSync(testConfigPath, `
+groups:
+  nav-stg:
+    tool: echo
+    mode: once
+    items:
+      ctx: staging
+`);
+
+      resetOutput();
+      const exitCode = await lsCommand('nav-stg');
+
+      assert.strictEqual(exitCode, 0);
+      assert.match(getLogOutput(), /Mode: once/);
+    });
+
+    it('should show sequential for a sequential one-shot group', async () => {
+      fs.writeFileSync(testConfigPath, `
+groups:
+  db-migrate:
+    tool: echo
+    mode: once
+    sequential: true
+    items:
+      schema: migrate
+      seed: seed
+`);
+
+      resetOutput();
+      await lsCommand('db-migrate');
+
+      assert.match(getLogOutput(), /Sequential: true/);
+    });
+
+    it('should not mention mode for a supervised group', async () => {
+      fs.writeFileSync(testConfigPath, `
+groups:
+  web:
+    tool: echo
+    restart: yes
+    items:
+      nginx: nginx
+`);
+
+      resetOutput();
+      await lsCommand('web');
+
+      assert.ok(
+        !getLogOutput().includes('Mode:'),
+        `expected no mode line, got ${JSON.stringify(getLogOutput())}`
+      );
+      assert.ok(!getLogOutput().includes('Sequential:'));
+    });
+  });
+
   describe('lsCommand', () => {
     it('should list items in a group', async () => {
       const configContent = `

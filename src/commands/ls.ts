@@ -4,11 +4,18 @@ export async function lsCommand(groupName: string): Promise<number> {
   const loader = new ConfigLoader();
 
   try {
-    const { config, restart } = loader.getGroup(groupName);
+    const { config, restart, mode, sequential } = loader.getGroup(groupName);
 
     console.log(`\nGroup: ${groupName}`);
     console.log(`Tool: ${config.tool}`);
     console.log(`Restart: ${restart}`);
+
+    // Only worth showing when it changes what running the group does.
+    if (mode === 'once') {
+      console.log(`Mode: ${mode}`);
+      if (sequential) console.log(`Sequential: ${sequential}`);
+    }
+
     console.log('\nItems:');
 
     const disabled = new Set(config.disabledItems || []);

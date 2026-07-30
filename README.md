@@ -66,3 +66,64 @@ Restart can be set on a **tool** (as a default) or on a **group** (to override t
 - `yes` - Always restart on exit
 - `no` - Never restart
 - `unless-stopped` - Restart unless killed by cligr
+
+## Run Modes
+
+By default cligr **supervises** a group: it keeps the processes alive, applies the
+restart policy, and holds the terminal open until you press Ctrl+C.
+
+Set `mode: once` for groups whose items are commands that do a job and exit. cligr
+runs them, shows their output, and returns to the shell with a meaningful exit code.
+
+```yaml
+tools:
+  kubectx:
+    cmd: kubectl config use-context $1
+    mode: once
+
+groups:
+  nav-stg:
+    tool: kubectx
+    items:
+      ctx: "staging"
+```
+
+```bash
+$ cligr nav-stg
+Switched to context "staging".
+$
+```
+
+Like `restart`, both keys can be set on a tool as a default and overridden on a group.
+
+- `mode` - `monitor` (default) or `once`
+- `sequential` - `false` (default) runs items at once; `true` runs them in config
+  order and stops at the first failure. Only meaningful with `mode: once`.
+
+```yaml
+groups:
+  db-migrate:
+    tool: node
+    mode: once
+    sequential: true
+    items:
+      schema: migrate.js
+      seed: seed.js
+```
+
+```bash
+$ cligr db-migrate
+→ schema
+Running migration 001... done
+→ seed
+Inserted 42 rows.
+```
+
+In `once` mode there are no restarts, no PID files, and no dashboard — `--no-ui`
+and `--ascii` are ignored. Output passes through untouched (colors and
+interactive prompts work) whenever only one process runs at a time, which covers
+single-item groups and every step of a sequential run. Items running in parallel
+are prefixed with `[item]` instead, so their output stays tellable apart.
+
+The exit code is the first non-zero exit in config order, or 0 when everything
+succeeded.

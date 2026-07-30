@@ -644,4 +644,179 @@ groups:
       assert.strictEqual(loader.getEffectiveRestart('web'), undefined);
     });
   });
+
+  describe('Run mode', () => {
+    it('should default to monitor mode with sequential off', () => {
+      const configContent = `
+groups:
+  web:
+    tool: echo
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('web');
+
+      assert.strictEqual(result.mode, 'monitor');
+      assert.strictEqual(result.sequential, false);
+    });
+
+    it('should inherit mode from tool when group has no mode', () => {
+      const configContent = `
+tools:
+  kubectx:
+    cmd: kubectl config use-context $1
+    mode: once
+
+groups:
+  nav-stg:
+    tool: kubectx
+    items:
+      ctx: staging
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('nav-stg');
+
+      assert.strictEqual(result.mode, 'once');
+    });
+
+    it('should allow group mode to override tool mode', () => {
+      const configContent = `
+tools:
+  kubectx:
+    cmd: kubectl config use-context $1
+    mode: once
+
+groups:
+  watcher:
+    tool: kubectx
+    mode: monitor
+    items:
+      ctx: staging
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('watcher');
+
+      assert.strictEqual(result.mode, 'monitor');
+    });
+
+    it('should read sequential from the group', () => {
+      const configContent = `
+groups:
+  db-migrate:
+    tool: node
+    mode: once
+    sequential: true
+    items:
+      schema: migrate.js
+      seed: seed.js
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('db-migrate');
+
+      assert.strictEqual(result.mode, 'once');
+      assert.strictEqual(result.sequential, true);
+    });
+
+    it('should allow group sequential to override tool sequential', () => {
+      const configContent = `
+tools:
+  node:
+    cmd: node $1
+    mode: once
+    sequential: true
+
+groups:
+  tasks:
+    tool: node
+    sequential: false
+    items:
+      one: one.js
+      two: two.js
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('tasks');
+
+      assert.strictEqual(result.sequential, false);
+    });
+
+    it('should reject a mode outside monitor and once', () => {
+      const configContent = `
+groups:
+  web:
+    tool: echo
+    mode: forever
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+
+      assert.throws(() => loader.load(), (err: Error) => {
+        assert.ok(err instanceof ConfigError);
+        assert.match(err.message, /web/);
+        assert.match(err.message, /mode/);
+        return true;
+      });
+    });
+
+    it('should reject a non-boolean sequential', () => {
+      const configContent = `
+groups:
+  web:
+    tool: echo
+    mode: once
+    sequential: sometimes
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+
+      assert.throws(() => loader.load(), (err: Error) => {
+        assert.ok(err instanceof ConfigError);
+        assert.match(err.message, /sequential/);
+        return true;
+      });
+    });
+
+    it('should reject an invalid mode on a tool', () => {
+      const configContent = `
+tools:
+  broken:
+    cmd: echo
+    mode: sometimes
+
+groups:
+  web:
+    tool: broken
+    items:
+      nginx: nginx
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+
+      assert.throws(() => loader.load(), (err: Error) => {
+        assert.ok(err instanceof ConfigError);
+        assert.match(err.message, /broken/);
+        return true;
+      });
+    });
+  });
 });

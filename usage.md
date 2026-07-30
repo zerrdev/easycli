@@ -1,6 +1,7 @@
 # Commands
 ## cligr up <group>
 Runs each item in a attached thread to the current process using the tool/executable indicated.
+Groups configured with `mode: once` instead run their items to completion, print the output, and exit.
 ## cligr down <group>
 Kills all threads from this group
 ## cligr ls <group>
