@@ -1,6 +1,6 @@
 {
   "name": "cligr",
-  "version": "1.0.18",
+  "version": "1.0.19",
   "main": "dist/index.js",
   "bin": {
     "cligr": "dist/index.js"
