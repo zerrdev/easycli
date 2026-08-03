@@ -368,6 +368,173 @@ describe('TemplateExpander Integration Tests', () => {
     });
   });
 
+  describe('Repeating params ($[[ ... ]])', () => {
+    const items: ItemEntry[] = [
+      { name: 'grafana', value: '13000:10.3.2.10:3000' },
+      { name: 'nexus', value: '8081:10.3.2.10:8081' }
+    ];
+
+    describe('hasRepeatingBlock()', () => {
+      it('should detect a repeating block', () => {
+        assert.strictEqual(TemplateExpander.hasRepeatingBlock('ssh $[[-L $1]] user@host -N'), true);
+      });
+
+      it('should not report a template without a block', () => {
+        assert.strictEqual(TemplateExpander.hasRepeatingBlock('ssh -L $1:$2:$3 user@host -N'), false);
+      });
+
+      it('should not mistake a plain bracket for a block', () => {
+        assert.strictEqual(TemplateExpander.hasRepeatingBlock('echo [[$1]]'), false);
+      });
+
+      it('should be stateless across repeated calls', () => {
+        const template = 'ssh $[[-L $1]] user@host -N';
+
+        assert.strictEqual(TemplateExpander.hasRepeatingBlock(template), true);
+        assert.strictEqual(TemplateExpander.hasRepeatingBlock(template), true);
+      });
+    });
+
+    describe('expandRepeating()', () => {
+      it('should repeat the block body once per item joined by the separator', () => {
+        const result = TemplateExpander.expandRepeating(
+          'ssh $[[-L $1]] user@host -N',
+          'ssh-basic2',
+          items,
+          ' '
+        );
+
+        assert.strictEqual(
+          result.fullCmd,
+          'ssh -L 13000:10.3.2.10:3000 -L 8081:10.3.2.10:8081 user@host -N'
+        );
+      });
+
+      it('should name the process after the group', () => {
+        const result = TemplateExpander.expandRepeating('ssh $[[-L $1]] user@host -N', 'ssh-basic2', items, ' ');
+
+        assert.strictEqual(result.name, 'ssh-basic2');
+      });
+
+      it('should default the separator to a single space', () => {
+        const result = TemplateExpander.expandRepeating('ssh $[[-L $1]] user@host -N', 'g', items);
+
+        assert.strictEqual(
+          result.fullCmd,
+          'ssh -L 13000:10.3.2.10:3000 -L 8081:10.3.2.10:8081 user@host -N'
+        );
+      });
+
+      it('should join with a custom separator', () => {
+        const result = TemplateExpander.expandRepeating('app --hosts $[[$1]] --go', 'g', items, ',');
+
+        assert.strictEqual(result.fullCmd, 'app --hosts 13000:10.3.2.10:3000,8081:10.3.2.10:8081 --go');
+      });
+
+      it('should expand positional placeholders from comma-split values', () => {
+        const commaItems: ItemEntry[] = [
+          { name: 'grafana', value: '13000,10.3.2.10,3000' },
+          { name: 'nexus', value: '8081,10.3.2.10,8081' }
+        ];
+
+        const result = TemplateExpander.expandRepeating('ssh $[[-L $1:$2:$3]] user@host -N', 'g', commaItems, ' ');
+
+        assert.strictEqual(
+          result.fullCmd,
+          'ssh -L 13000:10.3.2.10:3000 -L 8081:10.3.2.10:8081 user@host -N'
+        );
+      });
+
+      it('should trim whitespace around comma-split values', () => {
+        const commaItems: ItemEntry[] = [{ name: 'k8s', value: '36437, 10.5.100.112 ,6443' }];
+
+        const result = TemplateExpander.expandRepeating('ssh $[[-L $1:$2:$3]] user@host -N', 'g', commaItems, ' ');
+
+        assert.strictEqual(result.fullCmd, 'ssh -L 36437:10.5.100.112:6443 user@host -N');
+      });
+
+      it('should handle a single item', () => {
+        const result = TemplateExpander.expandRepeating(
+          'ssh $[[-L $1]] user@host -N',
+          'g',
+          [{ name: 'grafana', value: '13000:10.3.2.10:3000' }],
+          ' '
+        );
+
+        assert.strictEqual(result.fullCmd, 'ssh -L 13000:10.3.2.10:3000 user@host -N');
+      });
+
+      it('should substitute named params outside the block', () => {
+        const result = TemplateExpander.expandRepeating(
+          'ssh $[[-L $1]] $user@$host -N',
+          'g',
+          items,
+          ' ',
+          { user: 'gabriel.sales', host: 'jspicoas' }
+        );
+
+        assert.strictEqual(
+          result.fullCmd,
+          'ssh -L 13000:10.3.2.10:3000 -L 8081:10.3.2.10:8081 gabriel.sales@jspicoas -N'
+        );
+      });
+
+      it('should substitute named params inside the block', () => {
+        const result = TemplateExpander.expandRepeating(
+          'kubectl $[[--context $context $1]] --wait',
+          'g',
+          [{ name: 'a', value: 'svc-a' }, { name: 'b', value: 'svc-b' }],
+          ' ',
+          { context: 'devk8app' }
+        );
+
+        assert.strictEqual(
+          result.fullCmd,
+          'kubectl --context devk8app svc-a --context devk8app svc-b --wait'
+        );
+      });
+
+      it('should expand every block in the template', () => {
+        const result = TemplateExpander.expandRepeating('app $[[-a $1]] -- $[[-b $1]]', 'g', items, ' ');
+
+        assert.strictEqual(
+          result.fullCmd,
+          'app -a 13000:10.3.2.10:3000 -a 8081:10.3.2.10:8081 -- -b 13000:10.3.2.10:3000 -b 8081:10.3.2.10:8081'
+        );
+      });
+
+      it('should preserve text around the block', () => {
+        const result = TemplateExpander.expandRepeating('a b $[[$1]] c d', 'g', [{ name: 'x', value: 'X' }], ' ');
+
+        assert.strictEqual(result.fullCmd, 'a b X c d');
+      });
+
+      it('should collect the args of every item', () => {
+        const result = TemplateExpander.expandRepeating('ssh $[[-L $1]] user@host -N', 'g', items, ' ');
+
+        assert.deepStrictEqual(result.args, ['13000:10.3.2.10:3000', '8081:10.3.2.10:8081']);
+      });
+
+      it('should keep the block body verbatim when it has no placeholders', () => {
+        const result = TemplateExpander.expandRepeating('app $[[--flag]] end', 'g', items, ' ');
+
+        assert.strictEqual(result.fullCmd, 'app --flag --flag end');
+      });
+
+      it('should drop the block when there are no items', () => {
+        const result = TemplateExpander.expandRepeating('ssh $[[-L $1]] user@host -N', 'g', [], ' ');
+
+        assert.strictEqual(result.fullCmd, 'ssh  user@host -N');
+      });
+
+      it('should not consume text past the first block terminator', () => {
+        const result = TemplateExpander.expandRepeating('a $[[$1]] ]] b', 'g', [{ name: 'x', value: 'X' }], ' ');
+
+        assert.strictEqual(result.fullCmd, 'a X ]] b');
+      });
+    });
+  });
+
   describe('Named params', () => {
     it('should replace named param in template', () => {
       const template = 'node $1.js --name $name';

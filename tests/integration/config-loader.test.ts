@@ -819,4 +819,98 @@ groups:
       });
     });
   });
+
+  describe('Repeating params', () => {
+    it('should read the separator from the tool', () => {
+      const configContent = `
+tools:
+  ssh-multi-fwd:
+    cmd: ssh $[[-L $1]] user@host -N
+    separator: ','
+
+groups:
+  tunnels:
+    tool: ssh-multi-fwd
+    items:
+      grafana: 13000:10.3.2.10:3000
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('tunnels');
+
+      assert.strictEqual(result.separator, ',');
+    });
+
+    it('should default the separator to a single space', () => {
+      const configContent = `
+tools:
+  ssh-multi-fwd:
+    cmd: ssh $[[-L $1]] user@host -N
+
+groups:
+  tunnels:
+    tool: ssh-multi-fwd
+    items:
+      grafana: 13000:10.3.2.10:3000
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const result = new ConfigLoader().getGroup('tunnels');
+
+      assert.strictEqual(result.separator, ' ');
+    });
+
+    it('should reject a non-string separator', () => {
+      const configContent = `
+tools:
+  broken:
+    cmd: ssh $[[-L $1]] user@host -N
+    separator: 3
+
+groups:
+  tunnels:
+    tool: broken
+    items:
+      grafana: 13000
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+
+      assert.throws(() => loader.load(), (err: Error) => {
+        assert.ok(err instanceof ConfigError);
+        assert.match(err.message, /broken/);
+        assert.match(err.message, /separator/);
+        return true;
+      });
+    });
+
+    it('should reject an unterminated repeating block', () => {
+      const configContent = `
+tools:
+  broken:
+    cmd: ssh $[[-L $1 user@host -N
+
+groups:
+  tunnels:
+    tool: broken
+    items:
+      grafana: 13000
+`;
+
+      fs.writeFileSync(testConfigPath, configContent);
+
+      const loader = new ConfigLoader();
+
+      assert.throws(() => loader.load(), (err: Error) => {
+        assert.ok(err instanceof ConfigError);
+        assert.match(err.message, /broken/);
+        assert.match(err.message, /\$\[\[/);
+        return true;
+      });
+    });
+  });
 });

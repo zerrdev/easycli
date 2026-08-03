@@ -22,6 +22,18 @@ Options:
 Groups configured with "mode: once" run their items to completion, print the
 output, and exit, instead of being supervised.
 
+Placeholders in a tool's cmd:
+  $1, $2, $3...           The item's comma-separated values
+  $name                   A named param from the group's "params"
+  $[[ ... ]]              Repeat the fragment once per item, joined by the
+                          tool's "separator" (default a space). The group then
+                          runs as one process named after the group.
+
+  cmd:   ssh $[[-L $1]] user@jumphost -N
+  items: grafana: 13000:10.3.2.10:3000
+         nexus:   8081:10.3.2.10:8081
+  runs:  ssh -L 13000:10.3.2.10:3000 -L 8081:10.3.2.10:8081 user@jumphost -N
+
 Examples:
   cligr test1             Start all processes in test1
   cligr test1 --ascii     Start with an ASCII-only dashboard

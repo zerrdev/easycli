@@ -6,6 +6,7 @@ import type { CliGrConfig, GroupConfig, ToolConfig, ItemEntry, RunMode } from '.
 
 const CONFIG_FILENAME = '.cligr.yml';
 const RUN_MODES: RunMode[] = ['monitor', 'once'];
+const DEFAULT_SEPARATOR = ' ';
 
 export class ConfigError extends Error {
   constructor(message: string) {
@@ -77,6 +78,8 @@ export class ConfigLoader {
       for (const [toolName, tool] of Object.entries(cfg.tools as Record<string, unknown>)) {
         if (tool && typeof tool === 'object') {
           this.validateRunMode(tool as Record<string, unknown>, `Tool "${toolName}"`);
+          this.validateSeparator(tool as Record<string, unknown>, `Tool "${toolName}"`);
+          this.validateRepeatingBlocks(tool as Record<string, unknown>, `Tool "${toolName}"`);
         }
       }
     }
@@ -105,6 +108,36 @@ export class ConfigLoader {
 
     if (sequential !== undefined && typeof sequential !== 'boolean') {
       throw new ConfigError(`${label}: sequential must be true or false`);
+    }
+  }
+
+  private validateSeparator(entry: Record<string, unknown>, label: string): void {
+    const { separator } = entry;
+
+    if (separator !== undefined && typeof separator !== 'string') {
+      throw new ConfigError(
+        `${label}: separator must be a string (got "${String(separator)}"). ` +
+        `Quote it to keep whitespace, e.g. separator: ' '`
+      );
+    }
+  }
+
+  /**
+   * An unterminated block would otherwise be left verbatim in the command and
+   * only fail once the process is spawned.
+   */
+  private validateRepeatingBlocks(entry: Record<string, unknown>, label: string): void {
+    const { cmd } = entry;
+
+    if (typeof cmd !== 'string') {
+      return;
+    }
+
+    const opened = (cmd.match(/\$\[\[/g) || []).length;
+    const terminated = (cmd.match(/\$\[\[[\s\S]*?\]\]/g) || []).length;
+
+    if (opened !== terminated) {
+      throw new ConfigError(`${label}: unterminated $[[ ... ]] block in cmd`);
     }
   }
 
@@ -175,7 +208,7 @@ export class ConfigLoader {
     }));
   }
 
-  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; disabledNames: string[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart']; mode: RunMode; sequential: boolean } {
+  getGroup(name: string): { config: GroupConfig; items: ItemEntry[]; disabledNames: string[]; tool: string | null; toolTemplate: string | null; params: Record<string, string>; restart: GroupConfig['restart']; mode: RunMode; sequential: boolean; separator: string } {
     const config = this.load();
     const group = config.groups[name];
 
@@ -209,8 +242,9 @@ export class ConfigLoader {
     // Both settings resolve group-over-tool, the same way restart does.
     const mode = group.mode ?? toolConfig?.mode ?? 'monitor';
     const sequential = group.sequential ?? toolConfig?.sequential ?? false;
+    const separator = toolConfig?.separator ?? DEFAULT_SEPARATOR;
 
-    return { config: group, items, disabledNames, tool, toolTemplate, params, restart, mode, sequential };
+    return { config: group, items, disabledNames, tool, toolTemplate, params, restart, mode, sequential, separator };
   }
 
   getEffectiveRestart(groupName: string): GroupConfig['restart'] {

@@ -45,6 +45,8 @@ groups:
 **Syntax:**
 - Each item is a name and a comma-separated value: `itemName: "value1,value2"`
 - `$1` = first value, `$2`, `$3`... = the rest
+- `$[[ ... ]]` repeats a fragment across every item and runs the group as one process
+  (see [Repeating Params](#repeating-params))
 - Item names must be unique within a group, and are what `ls` and the dashboard show
 - If no `tool` is specified, the item value runs directly
 
@@ -72,6 +74,41 @@ groups:
       service1: "service1,8080,80"
       service2: "service2,8081,80"
 ```
+
+## Repeating Params
+
+Some tools take one fragment per item on a single command rather than one process per
+item — an SSH tunnel carrying every forward, for example. Wrap the repeating part of the
+tool's `cmd` in `$[[ ... ]]`:
+
+```yaml
+tools:
+  ssh-multi-fwd:
+    cmd: ssh $[[-L $1]] user@jumphost -N
+    separator: ' '
+
+groups:
+  tunnels:
+    tool: ssh-multi-fwd
+    items:
+      grafana: 13000:10.3.2.10:3000
+      nexus: 8081:10.3.2.10:8081
+```
+
+runs as **one** process:
+
+```
+ssh -L 13000:10.3.2.10:3000 -L 8081:10.3.2.10:8081 user@jumphost -N
+```
+
+- The block body expands once per enabled item; `separator` joins the fragments and
+  defaults to a single space
+- Inside the block, `$1`, `$2`... are the item's comma-separated values as usual, so
+  `$[[-L $1:$2:$3]]` with `13000,10.3.2.10,3000` items works equally well
+- Named params apply inside and outside the block
+- The group shows as a single process named after the group, so `ls`, the dashboard and
+  Ctrl+C act on the whole command
+- `disabledItems` are left out of the command; a group with none enabled is an error
 
 ## Usage
 

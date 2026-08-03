@@ -125,6 +125,11 @@ describe('usageText', () => {
   it('should mention that a bare group name starts that group', () => {
     assert.match(usageText(), /cligr <group>/);
   });
+
+  it('should document the repeating params placeholder', () => {
+    assert.ok(usageText().includes('$[['), 'usage should mention the $[[ ... ]] placeholder');
+    assert.match(usageText(), /separator/);
+  });
 });
 
 describe('shouldUseDashboard', () => {

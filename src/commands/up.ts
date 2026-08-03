@@ -19,15 +19,28 @@ export async function upCommand(groupName: string, options: UpOptions = {}): Pro
   const loader = new ConfigLoader();
 
   try {
-    const { items, disabledNames, tool, toolTemplate, params, restart, mode, sequential } =
+    const { items, disabledNames, tool, toolTemplate, params, restart, mode, sequential, separator } =
       loader.getGroup(groupName);
 
-    const processItems = items.map((item, index) =>
-      TemplateExpander.parseItem(tool, toolTemplate, item, index, params)
-    );
+    const repeating = toolTemplate !== null && TemplateExpander.hasRepeatingBlock(toolTemplate);
+
+    // A repeating template folds the whole group into one process, so its
+    // disabled items are left out of the command rather than tracked as rows.
+    const enabled = items.filter(item => !disabledNames.includes(item.name));
+
+    if (repeating && enabled.length === 0) {
+      console.error(`cligr: group ${groupName} has no enabled items`);
+      return 1;
+    }
+
+    const processItems = repeating
+      ? [TemplateExpander.expandRepeating(toolTemplate!, groupName, enabled, separator, params)]
+      : items.map((item, index) => TemplateExpander.parseItem(tool, toolTemplate, item, index, params));
+
+    const stoppedNames = repeating ? [] : disabledNames;
 
     if (mode === 'once') {
-      return runOneShot(groupName, processItems, disabledNames, sequential);
+      return runOneShot(groupName, processItems, stoppedNames, sequential);
     }
 
     // Only a supervised run tracks PIDs, so only it needs the stale sweep.
@@ -44,10 +57,10 @@ export async function upCommand(groupName: string, options: UpOptions = {}): Pro
       childStdin: useDashboard ? 'ignore' : 'inherit'
     });
 
-    manager.spawnGroup(groupName, processItems, restart, disabledNames);
+    manager.spawnGroup(groupName, processItems, restart, stoppedNames);
 
-    const startedCount = processItems.length - disabledNames.length;
-    const disabledNote = disabledNames.length ? `, ${disabledNames.length} disabled` : '';
+    const startedCount = processItems.length - stoppedNames.length;
+    const disabledNote = stoppedNames.length ? `, ${stoppedNames.length} disabled` : '';
     console.log(`Started group ${groupName} with ${startedCount} process(es)${disabledNote}`);
 
     return useDashboard

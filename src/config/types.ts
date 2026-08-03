@@ -6,6 +6,8 @@ export interface ToolConfig {
   restart?: 'yes' | 'no' | 'unless-stopped';
   mode?: RunMode;
   sequential?: boolean;
+  /** Joins the fragments a `$[[ ... ]]` block produces. Defaults to a space. */
+  separator?: string;
 }
 
 export interface ItemEntry {
