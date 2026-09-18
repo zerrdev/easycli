@@ -1,6 +1,6 @@
 import type { ItemStatus, ProcessManager } from '../process/manager.js';
 import { Painter } from './painter.js';
-import { render, type RenderModel } from './renderer.js';
+import { render, renderBanner, type RenderModel } from './renderer.js';
 
 export interface Screen {
   readonly columns: number;
@@ -35,6 +35,10 @@ const HISTORY_LINES = 50;
 
 /** How much of that history a failure reports. */
 const FAILURE_TAIL_LINES = 20;
+
+function lineCount(count: number): string {
+  return `${count} ${count === 1 ? 'line' : 'lines'}`;
+}
 
 interface ItemHistory {
   /** The retained lines, oldest first, at most HISTORY_LINES of them. */
@@ -103,7 +107,7 @@ export class Dashboard {
 
     if (count <= 0) return;
 
-    this.pendingLogs.push(`[${itemName}] -- last ${count} line(s) before exit ${code ?? 'signal'} --`);
+    this.pushBanner(itemName, `last ${lineCount(count)} before exit ${code ?? 'signal'}`);
     for (let i = from - oldestRetained; i < history.lines.length; i++) {
       this.pendingLogs.push(`[${itemName}] ${history.lines[i]}`);
     }
@@ -283,10 +287,17 @@ export class Dashboard {
     const history = this.history.get(itemName);
     if (history === undefined || history.lines.length === 0) return;
 
-    this.pendingLogs.push(`[${itemName}] -- ${history.lines.length} line(s) of history --`);
+    this.pushBanner(itemName, `last ${lineCount(history.lines.length)}`);
     for (const line of history.lines) {
       this.pendingLogs.push(`[${itemName}] ${line}`);
     }
+    // The live stream repeats the same prefix as the replay, so without a
+    // closing rule the two read as one continuous block.
+    this.pushBanner(itemName, 'following');
+  }
+
+  private pushBanner(itemName: string, detail: string): void {
+    this.pendingLogs.push(renderBanner(itemName, detail, this.screen.columns, this.ascii, this.color));
   }
 
   private historyFor(itemName: string): ItemHistory {

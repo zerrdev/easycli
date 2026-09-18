@@ -7,7 +7,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert';
-import { render, formatUptime } from '../../src/ui/renderer.js';
+import { render, formatUptime, renderBanner } from '../../src/ui/renderer.js';
 import type { RenderModel } from '../../src/ui/renderer.js';
 import type { ItemStatus } from '../../src/process/manager.js';
 
@@ -555,5 +555,53 @@ describe('render — filter', () => {
     const lines = render(model({ filterItem: null }), 80, 24);
 
     assert.doesNotMatch(lines[1], /filter/);
+  });
+});
+
+describe('renderBanner', () => {
+  it('should name the item and what the block holds', () => {
+    const banner = renderBanner('api', 'last 2 lines', 60, false, false);
+
+    assert.ok(banner.includes('api'));
+    assert.ok(banner.includes('last 2 lines'));
+  });
+
+  it('should not look like a prefixed log line', () => {
+    const banner = renderBanner('api', 'following', 60, false, false);
+
+    assert.ok(!banner.startsWith('[api]'), 'a rule, not an [item] prefix');
+    assert.ok(banner.startsWith('─'), 'opens with the separator glyph');
+  });
+
+  it('should fill the width with the rule', () => {
+    const banner = renderBanner('api', 'following', 60, false, false);
+
+    assert.strictEqual(banner.length, 59);
+  });
+
+  it('should fall back to ascii glyphs', () => {
+    const banner = renderBanner('api', 'following', 60, true, false);
+
+    assert.ok(banner.startsWith('----'));
+    assert.ok(!banner.includes('─'));
+  });
+
+  it('should dim the rule when colour is on', () => {
+    const banner = renderBanner('api', 'following', 60, false, true);
+
+    assert.ok(banner.startsWith('[2m'));
+    assert.ok(banner.endsWith('[0m'));
+  });
+
+  it('should leave the rule unpainted when colour is off', () => {
+    const banner = renderBanner('api', 'following', 60, false, false);
+
+    assert.ok(!banner.includes('['));
+  });
+
+  it('should truncate a label wider than the terminal', () => {
+    const banner = renderBanner('a-very-long-service-name', 'last 20 lines before exit 137', 20, false, false);
+
+    assert.strictEqual(banner.length, 19);
   });
 });

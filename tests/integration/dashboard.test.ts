@@ -325,6 +325,43 @@ describe('Dashboard log filtering', () => {
     assert.ok(!screen.text.includes('earlier'));
   });
 
+  it('should rule off the start and end of replayed history', async () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    manager.emit('process-log', 'g', 'a', 'earlier', false);
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    assert.ok(screen.text.includes('last 1 line'), 'history is introduced');
+    assert.ok(screen.text.includes('following'), 'the live stream is marked');
+  });
+
+  it('should not prefix the history rule with the item name', async () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    manager.emit('process-log', 'g', 'a', 'earlier', false);
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('[a] -- '), 'no longer reads as a log line');
+  });
+
+  it('should rule off a failure dump', () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    screen.clear();
+
+    manager.emit('process-log', 'g', 'a', 'boom', false);
+    manager.emit('item-failed', 'g', 'a', 137);
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('[a] -- '), 'no longer reads as a log line');
+    assert.ok(screen.text.includes('before exit 137'));
+  });
+
   it('should still replay the history after a failure dump', async () => {
     const { manager, screen, dashboard } = setup(['a']);
     manager.emit('process-log', 'g', 'a', 'boom', false);

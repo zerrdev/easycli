@@ -79,6 +79,9 @@ const MAX_NAME_WIDTH = 20;
 /** Rows consumed by the separator, header, hint line, and a minimum of log context. */
 const CHROME_ROWS = 6;
 
+/** Leading rule on a log banner, enough to read as a rule at a glance. */
+const BANNER_LEAD = 4;
+
 const COMMAND_PREFIX = ' $ ';
 const COMMAND_INDENT = ' '.repeat(COMMAND_PREFIX.length);
 
@@ -231,6 +234,21 @@ function buildCommandLines(
   }
 
   return wrapCommand(selected.command, glyphs, max, maxRows).map(text => ({ text, color: DIM }));
+}
+
+/**
+ * A full-width rule introducing a block of log lines. Log lines carry an
+ * `[item]` prefix, so a banner that did the same would read as just another
+ * line of output; the rule is what separates one block from the next.
+ */
+export function renderBanner(itemName: string, detail: string, width: number, ascii: boolean, color: boolean): string {
+  const glyphs = ascii ? ASCII : UNICODE;
+  const max = Math.max(1, width - 1);
+
+  const label = `${glyphs.separator.repeat(BANNER_LEAD)} ${itemName} ${glyphs.bullet} ${detail} `;
+  const fill = glyphs.separator.repeat(Math.max(0, max - label.length));
+
+  return paint(truncate(label + fill, max), DIM, color);
 }
 
 export interface ShutdownModel {
