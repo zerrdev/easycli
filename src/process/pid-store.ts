@@ -158,32 +158,27 @@ export class PidStore {
   }
 
   /**
-   * Check if a PID entry is still valid and running.
-   * This helps prevent killing wrong processes if PID is reused by the OS.
-   * A PID is considered valid if it's running AND started recently (within last 5 minutes).
+   * An entry is valid while its process is alive. Age deliberately plays no
+   * part: a group that has been up all day is the normal case, not a stale
+   * record, and treating it as one is what let a second invocation delete a
+   * running instance's entries.
    */
   isPidEntryValid(entry: PidEntry): boolean {
-    if (!this.isPidRunning(entry.pid)) {
-      return false;
-    }
-
-    // Check if the process start time is recent (within 5 minutes)
-    // This prevents killing a wrong process if PID was reused
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
-    return entry.startTime > fiveMinutesAgo;
+    return this.isPidRunning(entry.pid);
   }
 
   /**
-   * Remove PID files for processes that are no longer running
-   * Returns the list of stale entries that were removed
+   * Removes the PID files of a group's dead processes and returns them.
+   *
+   * Scoped to one group on purpose: another group's entries belong to whoever
+   * started it, which may be a second cligr running right now, and deleting
+   * them would strand that instance's children with nothing recording them.
    */
-  async cleanupStalePids(): Promise<PidEntry[]> {
-    const allEntries = await this.readAllPids();
+  async cleanupStalePids(groupName: string): Promise<PidEntry[]> {
+    const entries = await this.readPidsByGroup(groupName);
     const staleEntries: PidEntry[] = [];
 
-    for (const entry of allEntries) {
-      // Check if PID is no longer running OR if entry is too old (> 5 minutes)
-      // This helps prevent PID reuse issues
+    for (const entry of entries) {
       if (!this.isPidEntryValid(entry)) {
         staleEntries.push(entry);
         await this.deletePid(entry.groupName, entry.itemName);

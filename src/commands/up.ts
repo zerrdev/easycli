@@ -43,9 +43,10 @@ export async function upCommand(groupName: string, options: UpOptions = {}): Pro
       return runOneShot(groupName, processItems, stoppedNames, sequential);
     }
 
-    // Only a supervised run tracks PIDs, so only it needs the stale sweep.
+    // Only a supervised run tracks PIDs, so only it needs the stale sweep, and
+    // only for the group it is about to take over.
     const pidStore = new PidStore();
-    await pidStore.cleanupStalePids();
+    await pidStore.cleanupStalePids(groupName);
 
     const useDashboard = shouldUseDashboard({
       isTTY: Boolean(process.stdout.isTTY),

@@ -497,5 +497,63 @@ describe('ProcessManager Integration Tests', () => {
 
       await manager.killGroup('restart-event-group');
     });
+
+    it('should emit item-failed when a process exits on its own', { timeout: 3000 }, async () => {
+      const items: ProcessItem[] = [
+        { name: 'crasher', args: [], fullCmd: 'node -e "process.exit(3)"' }
+      ];
+
+      let failedItem = '';
+      let failedCode: number | null = null;
+      const failed = new Promise<void>(resolve => {
+        manager.once('item-failed', (_group: string, itemName: string, code: number | null) => {
+          failedItem = itemName;
+          failedCode = code;
+          resolve();
+        });
+      });
+
+      manager.spawnGroup('failed-event-group', items, 'no');
+
+      await failed;
+
+      assert.strictEqual(failedItem, 'crasher');
+      assert.strictEqual(failedCode, 3);
+
+      await manager.killGroup('failed-event-group');
+    });
+
+    it('should not emit item-failed when a process exits cleanly', { timeout: 3000 }, async () => {
+      const items: ProcessItem[] = [
+        { name: 'clean', args: [], fullCmd: 'node -e "process.exit(0)"' }
+      ];
+
+      let failures = 0;
+      manager.on('item-failed', () => { failures++; });
+
+      const exited = new Promise<void>(resolve => manager.once('item-exited', () => resolve()));
+      manager.spawnGroup('clean-exit-group', items, 'no');
+      await exited;
+
+      assert.strictEqual(failures, 0);
+
+      await manager.killGroup('clean-exit-group');
+    });
+
+    it('should not emit item-failed when the user stops an item', { timeout: 10000 }, async () => {
+      const items: ProcessItem[] = [
+        { name: 'alive', args: [], fullCmd: 'node -e "setInterval(()=>{},1000)"' }
+      ];
+
+      let failures = 0;
+      manager.on('item-failed', () => { failures++; });
+
+      manager.spawnGroup('manual-stop-group', items, 'yes');
+      await manager.stopItem('manual-stop-group', 'alive');
+
+      assert.strictEqual(failures, 0);
+
+      await manager.killGroup('manual-stop-group');
+    });
   });
 });

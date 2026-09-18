@@ -184,7 +184,7 @@ describe('Dashboard log filtering', () => {
     assert.strictEqual(dashboard.filterItem, 'b');
   });
 
-  it('should write log lines from every item when unfiltered', () => {
+  it('should not write log lines from healthy items when unfiltered', () => {
     const { manager, screen, dashboard } = setup(['a', 'b']);
     screen.clear();
 
@@ -192,8 +192,82 @@ describe('Dashboard log filtering', () => {
     manager.emit('process-log', 'g', 'b', 'from-b', false);
     dashboard.tick();
 
-    assert.ok(screen.text.includes('from-a'));
-    assert.ok(screen.text.includes('from-b'));
+    assert.ok(!screen.text.includes('from-a'));
+    assert.ok(!screen.text.includes('from-b'));
+  });
+
+  it('should write the recent lines of an item that went down', () => {
+    const { manager, screen, dashboard } = setup(['a', 'b']);
+    screen.clear();
+
+    manager.emit('process-log', 'g', 'a', 'boom', false);
+    manager.emit('item-failed', 'g', 'a', 1);
+    dashboard.tick();
+
+    assert.ok(screen.text.includes('[a] boom'));
+  });
+
+  it('should leave healthy items quiet when another one goes down', () => {
+    const { manager, screen, dashboard } = setup(['a', 'b']);
+    screen.clear();
+
+    manager.emit('process-log', 'g', 'a', 'boom', false);
+    manager.emit('process-log', 'g', 'b', 'fine', false);
+    manager.emit('item-failed', 'g', 'a', 1);
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('fine'));
+  });
+
+  it('should report the exit code alongside the recent lines', () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    screen.clear();
+
+    manager.emit('process-log', 'g', 'a', 'boom', false);
+    manager.emit('item-failed', 'g', 'a', 137);
+    dashboard.tick();
+
+    assert.ok(screen.text.includes('exit 137'));
+  });
+
+  it('should keep only the last lines of an item that went down', () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    screen.clear();
+
+    for (let i = 0; i < 60; i++) {
+      manager.emit('process-log', 'g', 'a', `line-${i}`, false);
+    }
+    manager.emit('item-failed', 'g', 'a', 1);
+    dashboard.tick();
+
+    const written = screen.text.split('[a] line-').length - 1;
+    assert.ok(written < 60, 'tail is capped');
+    assert.ok(screen.text.includes('line-59'), 'newest lines kept');
+  });
+
+  it('should not repeat the recent lines on a second failure', () => {
+    const { manager, screen, dashboard } = setup(['a']);
+
+    manager.emit('process-log', 'g', 'a', 'boom', false);
+    manager.emit('item-failed', 'g', 'a', 1);
+    dashboard.tick();
+    screen.clear();
+
+    manager.emit('item-failed', 'g', 'a', 1);
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('boom'));
+  });
+
+  it('should ignore failures from other groups', () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    screen.clear();
+
+    manager.emit('process-log', 'other', 'x', 'not-mine', false);
+    manager.emit('item-failed', 'other', 'x', 1);
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('not-mine'));
   });
 
   it('should suppress other items log lines while filtered', async () => {
@@ -209,8 +283,9 @@ describe('Dashboard log filtering', () => {
     assert.ok(!screen.text.includes('from-b'), 'other items are suppressed');
   });
 
-  it('should prefix log lines with the item name', () => {
+  it('should prefix log lines with the item name', async () => {
     const { manager, screen, dashboard } = setup(['a']);
+    await dashboard.handleKey({ name: 'f' });
     screen.clear();
 
     manager.emit('process-log', 'g', 'a', 'hello', false);

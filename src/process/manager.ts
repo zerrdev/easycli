@@ -202,6 +202,9 @@ export class ProcessManager extends EventEmitter {
     // Check restart policy
     if (restartPolicy === 'no') {
       if (managed) managed.status = 'stopped';
+      if (code !== 0) {
+        this.emit('item-failed', groupName, item.name, code);
+      }
       // Clean up PID file when not restarting
       this.pidStore.deletePid(groupName, item.name).catch(() => {});
       return;
@@ -221,11 +224,13 @@ export class ProcessManager extends EventEmitter {
       if (managed) managed.status = 'crashed';
       // Clean up PID file when stopping due to crash loop
       this.pidStore.deletePid(groupName, item.name).catch(() => {});
+      this.emit('item-failed', groupName, item.name, code);
       this.emit('item-crash-looped', groupName, item.name);
       return;
     }
 
     if (managed) managed.status = 'restarting';
+    this.emit('item-failed', groupName, item.name, code);
     this.emit('item-restarting', groupName, item.name, this.restartDelay, recentTimestamps.length);
 
     // Restart after delay
@@ -396,8 +401,8 @@ export class ProcessManager extends EventEmitter {
     return Promise.all(killPromises).then(() => {});
   }
 
-  async cleanupStalePids(): Promise<void> {
-    await this.pidStore.cleanupStalePids();
+  async cleanupStalePids(groupName: string): Promise<void> {
+    await this.pidStore.cleanupStalePids(groupName);
   }
 
   getGroupStatus(groupName: string): ProcessStatus[] {

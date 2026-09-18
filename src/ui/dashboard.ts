@@ -30,6 +30,9 @@ export interface DashboardOptions {
 const DEFAULT_RENDER_INTERVAL_MS = 50;
 const MAX_CONSECUTIVE_RENDER_FAILURES = 3;
 
+/** How much of an item's output is kept back to explain a failure. */
+const FAILURE_TAIL_LINES = 20;
+
 export class Dashboard {
   private readonly manager: ProcessManager;
   private readonly groupName: string;
@@ -49,11 +52,45 @@ export class Dashboard {
   private running = false;
   private timer: NodeJS.Timeout | null = null;
   private renderFailures = 0;
+  private readonly tails = new Map<string, string[]>();
 
+  /**
+   * Only the item being followed reaches the terminal. Everything else is held
+   * as a short tail: a group of twenty services produces far more output than
+   * a terminal can scroll, and the flood is what makes the dashboard feel
+   * frozen. The tail is written out if the item later goes down, so a failure
+   * still explains itself.
+   */
   private readonly onLog = (group: string, itemName: string, line: string, _isError: boolean): void => {
     if (group !== this.groupName) return;
-    if (this.filter !== null && this.filter !== itemName) return;
-    this.pendingLogs.push(`[${itemName}] ${line}`);
+
+    if (this.filter === itemName) {
+      this.pendingLogs.push(`[${itemName}] ${line}`);
+      return;
+    }
+
+    const tail = this.tails.get(itemName) ?? [];
+    tail.push(line);
+    if (tail.length > FAILURE_TAIL_LINES) {
+      tail.shift();
+    }
+    this.tails.set(itemName, tail);
+  };
+
+  private readonly onFailed = (group: string, itemName: string, code: number | null): void => {
+    if (group !== this.groupName) return;
+
+    const tail = this.tails.get(itemName);
+    // Dropped rather than kept, so a crash loop reports each failure's own
+    // output instead of repeating the first one.
+    this.tails.delete(itemName);
+
+    if (tail === undefined || tail.length === 0) return;
+
+    this.pendingLogs.push(`[${itemName}] -- last ${tail.length} line(s) before exit ${code ?? 'signal'} --`);
+    for (const line of tail) {
+      this.pendingLogs.push(`[${itemName}] ${line}`);
+    }
   };
 
   private readonly onResize = (): void => {
@@ -92,6 +129,7 @@ export class Dashboard {
     this.running = true;
 
     this.manager.on('process-log', this.onLog);
+    this.manager.on('item-failed', this.onFailed);
     this.screen.onResize(this.onResize);
     this.painter.hideCursor();
 
@@ -111,11 +149,13 @@ export class Dashboard {
     }
 
     this.manager.off('process-log', this.onLog);
+    this.manager.off('item-failed', this.onFailed);
     this.screen.offResize(this.onResize);
 
     this.painter.erase();
     this.painter.showCursor();
     this.pendingLogs = [];
+    this.tails.clear();
     this.lastPainted = '';
   }
 
