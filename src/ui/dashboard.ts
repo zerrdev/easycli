@@ -30,8 +30,20 @@ export interface DashboardOptions {
 const DEFAULT_RENDER_INTERVAL_MS = 50;
 const MAX_CONSECUTIVE_RENDER_FAILURES = 3;
 
-/** How much of an item's output is kept back to explain a failure. */
+/** How much of each item's output is kept for the focused view to replay. */
+const HISTORY_LINES = 50;
+
+/** How much of that history a failure reports. */
 const FAILURE_TAIL_LINES = 20;
+
+interface ItemHistory {
+  /** The retained lines, oldest first, at most HISTORY_LINES of them. */
+  lines: string[];
+  /** Every line ever seen, so positions stay stable as the window slides. */
+  produced: number;
+  /** Position a previous failure reported up to, so crash loops do not repeat. */
+  failureReportedUpTo: number;
+}
 
 export class Dashboard {
   private readonly manager: ProcessManager;
@@ -52,44 +64,48 @@ export class Dashboard {
   private running = false;
   private timer: NodeJS.Timeout | null = null;
   private renderFailures = 0;
-  private readonly tails = new Map<string, string[]>();
+  private readonly history = new Map<string, ItemHistory>();
 
   /**
-   * Only the item being followed reaches the terminal. Everything else is held
-   * as a short tail: a group of twenty services produces far more output than
-   * a terminal can scroll, and the flood is what makes the dashboard feel
-   * frozen. The tail is written out if the item later goes down, so a failure
-   * still explains itself.
+   * Every line is recorded, but only the item being followed reaches the
+   * terminal. A group of twenty services produces far more output than a
+   * terminal can scroll, and that flood is what makes the dashboard feel
+   * frozen; keeping the lines back means focusing an item can still show where
+   * it has been, and a failure can still explain itself.
    */
   private readonly onLog = (group: string, itemName: string, line: string, _isError: boolean): void => {
     if (group !== this.groupName) return;
 
-    if (this.filter === itemName) {
-      this.pendingLogs.push(`[${itemName}] ${line}`);
-      return;
+    const history = this.historyFor(itemName);
+    history.lines.push(line);
+    history.produced++;
+    if (history.lines.length > HISTORY_LINES) {
+      history.lines.shift();
     }
 
-    const tail = this.tails.get(itemName) ?? [];
-    tail.push(line);
-    if (tail.length > FAILURE_TAIL_LINES) {
-      tail.shift();
+    if (this.filter === itemName) {
+      this.pendingLogs.push(`[${itemName}] ${line}`);
     }
-    this.tails.set(itemName, tail);
   };
 
   private readonly onFailed = (group: string, itemName: string, code: number | null): void => {
     if (group !== this.groupName) return;
 
-    const tail = this.tails.get(itemName);
-    // Dropped rather than kept, so a crash loop reports each failure's own
-    // output instead of repeating the first one.
-    this.tails.delete(itemName);
+    const history = this.history.get(itemName);
+    if (history === undefined) return;
 
-    if (tail === undefined || tail.length === 0) return;
+    const oldestRetained = history.produced - history.lines.length;
+    // Never re-reports what an earlier failure already showed, so a crash loop
+    // reports each attempt's own output rather than repeating the first.
+    const from = Math.max(history.produced - FAILURE_TAIL_LINES, history.failureReportedUpTo, oldestRetained);
+    const count = history.produced - from;
+    history.failureReportedUpTo = history.produced;
 
-    this.pendingLogs.push(`[${itemName}] -- last ${tail.length} line(s) before exit ${code ?? 'signal'} --`);
-    for (const line of tail) {
-      this.pendingLogs.push(`[${itemName}] ${line}`);
+    if (count <= 0) return;
+
+    this.pendingLogs.push(`[${itemName}] -- last ${count} line(s) before exit ${code ?? 'signal'} --`);
+    for (let i = from - oldestRetained; i < history.lines.length; i++) {
+      this.pendingLogs.push(`[${itemName}] ${history.lines[i]}`);
     }
   };
 
@@ -155,7 +171,7 @@ export class Dashboard {
     this.painter.erase();
     this.painter.showCursor();
     this.pendingLogs = [];
-    this.tails.clear();
+    this.history.clear();
     this.lastPainted = '';
   }
 
@@ -252,7 +268,34 @@ export class Dashboard {
   private toggleFilter(): void {
     const selected = this.selected();
     if (!selected) return;
-    this.filter = this.filter === selected.name ? null : selected.name;
+
+    if (this.filter === selected.name) {
+      this.filter = null;
+      return;
+    }
+
+    this.filter = selected.name;
+    this.replayHistory(selected.name);
+  }
+
+  /** Writes out what the item has said so far, so focusing it is not a blank start. */
+  private replayHistory(itemName: string): void {
+    const history = this.history.get(itemName);
+    if (history === undefined || history.lines.length === 0) return;
+
+    this.pendingLogs.push(`[${itemName}] -- ${history.lines.length} line(s) of history --`);
+    for (const line of history.lines) {
+      this.pendingLogs.push(`[${itemName}] ${line}`);
+    }
+  }
+
+  private historyFor(itemName: string): ItemHistory {
+    const existing = this.history.get(itemName);
+    if (existing !== undefined) return existing;
+
+    const created: ItemHistory = { lines: [], produced: 0, failureReportedUpTo: 0 };
+    this.history.set(itemName, created);
+    return created;
   }
 
   private async restartSelected(): Promise<void> {

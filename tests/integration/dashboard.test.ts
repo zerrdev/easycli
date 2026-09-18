@@ -270,6 +270,74 @@ describe('Dashboard log filtering', () => {
     assert.ok(!screen.text.includes('not-mine'));
   });
 
+  it('should replay the stored history when an item is focused', async () => {
+    const { manager, screen, dashboard } = setup(['a', 'b']);
+    manager.emit('process-log', 'g', 'a', 'earlier', false);
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    assert.ok(screen.text.includes('[a] earlier'));
+  });
+
+  it('should replay only the focused item history', async () => {
+    const { manager, screen, dashboard } = setup(['a', 'b']);
+    manager.emit('process-log', 'g', 'b', 'from-b', false);
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('from-b'));
+  });
+
+  it('should cap the history it replays', async () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    for (let i = 0; i < 120; i++) {
+      manager.emit('process-log', 'g', 'a', `line-${i}`, false);
+    }
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    const replayed = screen.text.split('[a] line-').length - 1;
+    assert.strictEqual(replayed, 50, 'history is capped at 50 lines');
+    assert.ok(screen.text.includes('line-119'), 'newest line kept');
+    assert.ok(screen.text.includes('line-70'), 'oldest retained line kept');
+    assert.ok(!screen.text.includes('line-69'), 'older lines dropped');
+  });
+
+  it('should not replay the history when focus is toggled off', async () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    manager.emit('process-log', 'g', 'a', 'earlier', false);
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    assert.ok(!screen.text.includes('earlier'));
+  });
+
+  it('should still replay the history after a failure dump', async () => {
+    const { manager, screen, dashboard } = setup(['a']);
+    manager.emit('process-log', 'g', 'a', 'boom', false);
+    manager.emit('item-failed', 'g', 'a', 1);
+    dashboard.tick();
+    screen.clear();
+
+    await dashboard.handleKey({ name: 'f' });
+    dashboard.tick();
+
+    assert.ok(screen.text.includes('[a] boom'));
+  });
+
   it('should suppress other items log lines while filtered', async () => {
     const { manager, screen, dashboard } = setup(['a', 'b']);
     await dashboard.handleKey({ name: 'f' });
