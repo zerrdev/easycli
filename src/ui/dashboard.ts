@@ -72,7 +72,7 @@ export class Dashboard {
     this.now = options.now ?? (() => Date.now());
     this.renderIntervalMs = options.renderIntervalMs ?? DEFAULT_RENDER_INTERVAL_MS;
     this.onQuit = options.onQuit ?? (() => {});
-    this.painter = new Painter(chunk => this.screen.write(chunk));
+    this.painter = new Painter(this.screen);
   }
 
   get selectedIndex(): number {

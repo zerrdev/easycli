@@ -1,22 +1,52 @@
-const CLEAR_LINE = '\x1b[K';
-const CLEAR_BELOW = '\x1b[0J';
+import { createLogUpdate } from 'log-update';
+import type { Screen } from './dashboard.js';
+
 const HIDE_CURSOR = '\x1b[?25l';
 const SHOW_CURSOR = '\x1b[?25h';
 
 /**
- * Owns the pinned footer's escape sequences and the count of lines it last
- * painted. Every write to the terminal goes through here so the footer is
- * always repainted below whatever else was written.
+ * log-update reads the width, height and TTY-ness of the stream it writes to,
+ * so the screen is adapted to the little of a stream it actually touches.
+ */
+function asStream(screen: Screen): NodeJS.WritableStream {
+  return {
+    write: (chunk: string) => {
+      screen.write(chunk);
+      return true;
+    },
+    get columns() {
+      return screen.columns;
+    },
+    get rows() {
+      return screen.rows;
+    },
+    // The dashboard only runs on a TTY; log-update uses this to wrap each
+    // repaint in a synchronized update.
+    isTTY: true
+  } as unknown as NodeJS.WritableStream;
+}
+
+/**
+ * Owns the pinned footer and the count of lines it last painted. Every write
+ * to the terminal goes through here so the footer is always repainted below
+ * whatever else was written.
  *
- * Repaints overwrite the previous block in a single pass rather than clearing
- * it first. Clearing before rewriting leaves a frame in which the footer is
- * blank, which at repaint rates reads as a blink; overwriting each line and
- * clearing only what falls below the new content never shows an empty block.
+ * Repainting is delegated to log-update rather than hand-rolled cursor
+ * arithmetic: it diffs consecutive frames, counts the physical rows a frame
+ * occupies once wrapped to the terminal width, and emits the repaint as a
+ * synchronized update. Moving the cursor up and overwriting the block in place
+ * is correct by the spec and works in most terminals, but Tabby renders each
+ * repaint two rows lower than asked, stranding the top of every frame.
  */
 export class Painter {
   private painted = 0;
+  private readonly render: ReturnType<typeof createLogUpdate>;
 
-  constructor(private readonly write: (chunk: string) => void) {}
+  constructor(private readonly screen: Screen) {
+    // The dashboard hides and shows the cursor around its own lifetime, so
+    // log-update must not also take it upon itself.
+    this.render = createLogUpdate(asStream(screen), { showCursor: true });
+  }
 
   get paintedLines(): number {
     return this.painted;
@@ -33,30 +63,17 @@ export class Painter {
       return;
     }
 
-    const parts: string[] = [];
-
-    // Return to the top of the previously painted block. Painting leaves the
-    // cursor on its last line, so the distance is one less than the count.
-    if (this.painted > 0) {
-      parts.push('\r');
-      if (this.painted > 1) {
-        parts.push(`\x1b[${this.painted - 1}A`);
-      }
+    // Log lines are permanent: they take over the rows the footer occupied and
+    // stay in the scrollback, and the footer is drawn again below them.
+    if (logLines.length > 0) {
+      this.render.persist(logLines.join('\n'));
+      this.painted = 0;
     }
 
-    // Each row clears to end of line as it is written, so leftovers from a
-    // longer previous row cannot show through.
-    parts.push([...logLines, ...footerLines].map(line => `${line}${CLEAR_LINE}`).join('\n'));
-
-    // Clears rows the block no longer occupies, e.g. after it shrinks.
-    parts.push(CLEAR_BELOW);
-
-    // With no footer to land on, the log still needs to end its row.
-    if (footerLines.length === 0) {
-      parts.push('\n');
+    if (footerLines.length > 0) {
+      this.render(footerLines.join('\n'));
     }
 
-    this.write(parts.join(''));
     this.painted = footerLines.length;
   }
 
@@ -65,21 +82,21 @@ export class Painter {
       return;
     }
 
-    const up = this.painted > 1 ? `\x1b[${this.painted - 1}A` : '';
-    this.write(`\r${up}${CLEAR_BELOW}`);
+    this.render.clear();
     this.painted = 0;
   }
 
   hideCursor(): void {
-    this.write(HIDE_CURSOR);
+    this.screen.write(HIDE_CURSOR);
   }
 
   showCursor(): void {
-    this.write(SHOW_CURSOR);
+    this.screen.write(SHOW_CURSOR);
   }
 
   /** Drops the painted block without emitting escapes, for use after a resize. */
   reset(): void {
+    this.render.done();
     this.painted = 0;
   }
 }

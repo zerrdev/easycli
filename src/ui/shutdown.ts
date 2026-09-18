@@ -29,7 +29,7 @@ export class ShutdownView {
     this.ascii = options.ascii ?? false;
     this.color = options.color ?? false;
     this.items = options.items.map(name => ({ name, stopped: false }));
-    this.painter = new Painter(chunk => this.screen.write(chunk));
+    this.painter = new Painter(this.screen);
   }
 
   start(): void {
