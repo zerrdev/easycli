@@ -483,16 +483,29 @@ describe('render — command line', () => {
     assert.strictEqual(rows.map(row => row.trim()).join(''), `$ ${command}`);
   });
 
-  it('should mark a command that is too long to wrap in full', () => {
+  it('should show every row a long command needs', () => {
     const command = Array.from({ length: 60 }, (_, i) => `--flag${i}`).join(' ');
     const lines = render(
       model({ items: [status({ name: 'api', command })], showCommand: true }),
       40,
-      24
+      40
     );
 
     const rows = commandLines(lines);
-    assert.strictEqual(rows.length, 4);
+    assert.ok(rows.length > 4, `expected more than four rows, got ${rows.length}`);
+    assert.strictEqual(rows.map(row => row.trim()).join(' '), `$ ${command}`);
+  });
+
+  it('should mark a command too long to fit on screen', () => {
+    const command = Array.from({ length: 60 }, (_, i) => `--flag${i}`).join(' ');
+    const lines = render(
+      model({ items: [status({ name: 'api', command })], showCommand: true }),
+      40,
+      10
+    );
+
+    const rows = commandLines(lines);
+    assert.strictEqual(rows.length, 5, 'height 10 leaves five rows for the command');
     assert.match(rows[rows.length - 1], /…$/);
   });
 
@@ -513,8 +526,9 @@ describe('render — command line', () => {
 
     const lines = render(model({ items: many, showCommand: true }), 40, 8);
 
-    assert.strictEqual(lines.length, 5, 'separator, header, one item row, one command row, hint');
-    assert.match(lines[lines.length - 2], /^ \$ a+/);
+    assert.strictEqual(lines.length, 7, 'separator, header, one item row, three command rows, hint');
+    assert.ok(lines.length < 8, 'the footer leaves a row of log context');
+    assert.match(lines[3], /^ \$ a+/);
   });
 
   it('should show nothing when the group has no items', () => {

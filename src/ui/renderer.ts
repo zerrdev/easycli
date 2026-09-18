@@ -81,7 +81,12 @@ const CHROME_ROWS = 6;
 
 const COMMAND_PREFIX = ' $ ';
 const COMMAND_INDENT = ' '.repeat(COMMAND_PREFIX.length);
-const MAX_COMMAND_ROWS = 4;
+
+/**
+ * Rows the command never takes: the separator, header, one item row, the hint,
+ * and one row of log context.
+ */
+const COMMAND_RESERVED_ROWS = 5;
 
 export function formatUptime(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -263,10 +268,10 @@ export function render(model: RenderModel, width: number, height: number): strin
   const glyphs = model.ascii ? ASCII : UNICODE;
   const max = Math.max(1, width - 1);
 
-  // The command takes its rows from the item list rather than growing the
-  // footer, so toggling it does not push logs off the screen. One item row is
-  // always kept, however long the command is.
-  const commandBudget = Math.min(MAX_COMMAND_ROWS, Math.max(1, height - CHROME_ROWS - 1));
+  // Showing the command means wanting all of it, to read or to copy, so it may
+  // take every row the terminal can spare. It is cut short only when the whole
+  // command cannot physically fit on screen.
+  const commandBudget = Math.max(1, height - COMMAND_RESERVED_ROWS);
   const commandLines = model.showCommand ? buildCommandLines(model, glyphs, max, commandBudget) : [];
 
   const maxRows = Math.max(1, height - CHROME_ROWS - commandLines.length);
