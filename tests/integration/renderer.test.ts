@@ -381,6 +381,9 @@ describe('render — command line', () => {
   /** The command line sits directly above the hint line. */
   const commandLine = (lines: string[]) => lines[lines.length - 2];
 
+  /** With a single item, the command occupies every row between it and the hint. */
+  const commandLines = (lines: string[]) => lines.slice(3, -1);
+
   it('should not show a command line by default', () => {
     const lines = render(model(), 80, 24);
 
@@ -452,6 +455,66 @@ describe('render — command line', () => {
       // eslint-disable-next-line no-control-regex
       assert.doesNotMatch(line, /[^\x00-\x7F]/, `non-ascii in: ${line}`);
     }
+  });
+
+  it('should wrap a long command instead of truncating it', () => {
+    const command = 'node --experimental-vm-modules ./scripts/serve.js --port 3000 --watch src';
+    const lines = render(
+      model({ items: [status({ name: 'api', command })], showCommand: true }),
+      40,
+      24
+    );
+
+    const rows = commandLines(lines);
+    assert.ok(rows.length > 1, 'expected the command to span several rows');
+    assert.strictEqual(rows.map(row => row.trim()).join(' '), `$ ${command}`);
+  });
+
+  it('should hard-break a command with no spaces to break on', () => {
+    const command = 'x'.repeat(100);
+    const lines = render(
+      model({ items: [status({ name: 'api', command })], showCommand: true }),
+      40,
+      24
+    );
+
+    const rows = commandLines(lines);
+    assert.ok(rows.length > 1, 'expected the command to span several rows');
+    assert.strictEqual(rows.map(row => row.trim()).join(''), `$ ${command}`);
+  });
+
+  it('should mark a command that is too long to wrap in full', () => {
+    const command = Array.from({ length: 60 }, (_, i) => `--flag${i}`).join(' ');
+    const lines = render(
+      model({ items: [status({ name: 'api', command })], showCommand: true }),
+      40,
+      24
+    );
+
+    const rows = commandLines(lines);
+    assert.strictEqual(rows.length, 4);
+    assert.match(rows[rows.length - 1], /…$/);
+  });
+
+  it('should keep the footer height stable when the command wraps', () => {
+    const command = 'run --flag one --flag two --flag three --flag four --flag five';
+    const many = Array.from({ length: 10 }, (_, i) => status({ name: `item${i}`, command }));
+
+    const off = render(model({ items: many, showCommand: false }), 40, 16);
+    const on = render(model({ items: many, showCommand: true }), 40, 16);
+
+    assert.strictEqual(on.length, off.length, 'total footer height is unchanged');
+  });
+
+  it('should leave an item row visible when the command fills the footer', () => {
+    const many = Array.from({ length: 10 }, (_, i) =>
+      status({ name: `item${i}`, command: 'a'.repeat(500) })
+    );
+
+    const lines = render(model({ items: many, showCommand: true }), 40, 8);
+
+    assert.strictEqual(lines.length, 5, 'separator, header, one item row, one command row, hint');
+    assert.match(lines[lines.length - 2], /^ \$ a+/);
   });
 
   it('should show nothing when the group has no items', () => {

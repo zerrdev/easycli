@@ -25,6 +25,7 @@ interface Glyphs {
   moreBelow: string;
   times: string;
   done: string;
+  ellipsis: string;
 }
 
 const UNICODE: Glyphs = {
@@ -39,7 +40,8 @@ const UNICODE: Glyphs = {
   moreAbove: '↑',
   moreBelow: '↓',
   times: '×',
-  done: '✓'
+  done: '✓',
+  ellipsis: '…'
 };
 
 const ASCII: Glyphs = {
@@ -54,7 +56,8 @@ const ASCII: Glyphs = {
   moreAbove: '^',
   moreBelow: 'v',
   times: 'x',
-  done: '[v]'
+  done: '[v]',
+  ellipsis: '...'
 };
 
 const RESET = '\x1b[0m';
@@ -75,6 +78,10 @@ const MAX_NAME_WIDTH = 20;
 
 /** Rows consumed by the separator, header, hint line, and a minimum of log context. */
 const CHROME_ROWS = 6;
+
+const COMMAND_PREFIX = ' $ ';
+const COMMAND_INDENT = ' '.repeat(COMMAND_PREFIX.length);
+const MAX_COMMAND_ROWS = 4;
 
 export function formatUptime(ms: number): string {
   const totalSeconds = Math.max(0, Math.floor(ms / 1000));
@@ -178,13 +185,47 @@ function buildHint(glyphs: Glyphs): string {
   return ` ${select}  [r] restart  [s] stop  [f] filter  [v] cmd  [R] group  [q] quit`;
 }
 
-function buildCommandLine(model: RenderModel): { text: string; color: string } | null {
-  const selected = model.items[model.selectedIndex];
-  if (!selected) {
-    return null;
+function wrapCommand(command: string, glyphs: Glyphs, max: number, maxRows: number): string[] {
+  const rows: string[] = [];
+  let rest = command;
+
+  while (rest.length > 0 && rows.length < maxRows) {
+    const indent = rows.length === 0 ? COMMAND_PREFIX : COMMAND_INDENT;
+    const room = Math.max(1, max - indent.length);
+
+    if (rest.length <= room) {
+      rows.push(indent + rest);
+      return rows;
+    }
+
+    // Break on the last space that fits so arguments stay intact; a token
+    // longer than the row has no such space and is cut at the edge instead.
+    const space = rest.lastIndexOf(' ', room);
+    const cut = space > 0 ? space : room;
+    rows.push(indent + rest.slice(0, cut).trimEnd());
+    rest = rest.slice(cut).trimStart();
   }
 
-  return { text: ` $ ${selected.command}`, color: DIM };
+  if (rest.length > 0) {
+    const last = rows[rows.length - 1];
+    rows[rows.length - 1] = truncate(last, max - glyphs.ellipsis.length) + glyphs.ellipsis;
+  }
+
+  return rows;
+}
+
+function buildCommandLines(
+  model: RenderModel,
+  glyphs: Glyphs,
+  max: number,
+  maxRows: number
+): Array<{ text: string; color: string }> {
+  const selected = model.items[model.selectedIndex];
+  if (!selected) {
+    return [];
+  }
+
+  return wrapCommand(selected.command, glyphs, max, maxRows).map(text => ({ text, color: DIM }));
 }
 
 export interface ShutdownModel {
@@ -222,11 +263,13 @@ export function render(model: RenderModel, width: number, height: number): strin
   const glyphs = model.ascii ? ASCII : UNICODE;
   const max = Math.max(1, width - 1);
 
-  const commandLine = model.showCommand ? buildCommandLine(model) : null;
+  // The command takes its rows from the item list rather than growing the
+  // footer, so toggling it does not push logs off the screen. One item row is
+  // always kept, however long the command is.
+  const commandBudget = Math.min(MAX_COMMAND_ROWS, Math.max(1, height - CHROME_ROWS - 1));
+  const commandLines = model.showCommand ? buildCommandLines(model, glyphs, max, commandBudget) : [];
 
-  // The command line takes its row from the item list rather than growing the
-  // footer, so toggling it does not push logs off the screen.
-  const maxRows = Math.max(1, height - CHROME_ROWS - (commandLine ? 1 : 0));
+  const maxRows = Math.max(1, height - CHROME_ROWS - commandLines.length);
 
   const nameWidth = model.items.length
     ? Math.min(MAX_NAME_WIDTH, Math.max(...model.items.map(i => i.name.length)))
@@ -236,7 +279,7 @@ export function render(model: RenderModel, width: number, height: number): strin
     { text: glyphs.separator.repeat(max), color: DIM },
     { text: buildHeader(model, glyphs), color: DIM },
     ...buildItemRows(model, glyphs, maxRows, nameWidth),
-    ...(commandLine ? [commandLine] : []),
+    ...commandLines,
     { text: buildHint(glyphs), color: DIM }
   ];
 
