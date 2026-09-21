@@ -38,6 +38,7 @@ tools:
 # - $1 = first value, $2, $3... = the rest
 # - If no tool is specified, the item value runs directly
 # - restart: yes | no | unless-stopped
+#   unless-stopped also leaves items you stop by hand stopped on the next run
 # - mode: once runs the group to completion and exits instead of supervising it
 `;
 

@@ -3,6 +3,7 @@ import type { ProcessItem } from '../config/types.js';
 import { TemplateExpander } from '../process/template.js';
 import { ProcessManager } from '../process/manager.js';
 import { PidStore } from '../process/pid-store.js';
+import { StoppedStore, stoppedAtStartup } from '../process/stopped-store.js';
 import { runOnce } from '../process/one-shot.js';
 import { Dashboard } from '../ui/dashboard.js';
 import { PlainLogger } from '../ui/plain-logger.js';
@@ -48,6 +49,11 @@ export async function upCommand(groupName: string, options: UpOptions = {}): Pro
     const pidStore = new PidStore();
     await pidStore.cleanupStalePids(groupName);
 
+    // A supervised run also honours stops made by hand in an earlier one, which
+    // is what separates `unless-stopped` from `yes`.
+    const remembered = await new StoppedStore().read(groupName);
+    const supervisedStops = stoppedAtStartup({ disabledNames, remembered, repeating, restart });
+
     const useDashboard = shouldUseDashboard({
       isTTY: Boolean(process.stdout.isTTY),
       noUi: options.noUi ?? false,
@@ -58,11 +64,19 @@ export async function upCommand(groupName: string, options: UpOptions = {}): Pro
       childStdin: useDashboard ? 'ignore' : 'inherit'
     });
 
-    manager.spawnGroup(groupName, processItems, restart, stoppedNames);
+    manager.spawnGroup(groupName, processItems, restart, supervisedStops);
 
-    const startedCount = processItems.length - stoppedNames.length;
-    const disabledNote = stoppedNames.length ? `, ${stoppedNames.length} disabled` : '';
-    console.log(`Started group ${groupName} with ${startedCount} process(es)${disabledNote}`);
+    // Remembered stops are counted apart from disabled ones, so an item left
+    // down by a previous run does not look like it silently failed to start.
+    const disabledCount = supervisedStops.filter(name => disabledNames.includes(name)).length;
+    const rememberedCount = supervisedStops.length - disabledCount;
+    const notes: string[] = [];
+    if (disabledCount) notes.push(`${disabledCount} disabled`);
+    if (rememberedCount) notes.push(`${rememberedCount} stopped earlier`);
+
+    const startedCount = processItems.length - supervisedStops.length;
+    const note = notes.length ? `, ${notes.join(', ')}` : '';
+    console.log(`Started group ${groupName} with ${startedCount} process(es)${note}`);
 
     return useDashboard
       ? runWithDashboard(manager, groupName, options)

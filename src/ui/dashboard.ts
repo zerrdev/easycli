@@ -327,7 +327,7 @@ export class Dashboard {
     if (selected.status === 'running' || selected.status === 'restarting') {
       await this.manager.stopItem(this.groupName, selected.name);
     } else {
-      this.manager.startItem(this.groupName, selected.name);
+      await this.manager.startItem(this.groupName, selected.name);
     }
   }
 

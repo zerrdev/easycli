@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
 import type { GroupConfig, ProcessItem } from '../config/types.js';
 import { PidStore, type PidEntry } from './pid-store.js';
+import { StoppedStore } from './stopped-store.js';
 import { parseCommand, killProcess } from './spawn-utils.js';
 
 export type ProcessStatus = 'running' | 'restarting' | 'stopped' | 'crashed';
@@ -43,6 +44,7 @@ export class ProcessManager extends EventEmitter {
   private readonly restartWindow = 10000; // 10 seconds
   private readonly restartDelay = 1000;
   private readonly pidStore = new PidStore();
+  private readonly stoppedStore = new StoppedStore();
 
   /**
    * The dashboard puts the parent terminal in raw mode, so children must not
@@ -275,11 +277,21 @@ export class ProcessManager extends EventEmitter {
     // crash-loop threshold again on its first exit.
     this.restartTimestamps.delete(`${groupName}-${itemName}`);
 
-    await this.stopItem(groupName, itemName);
-    this.startItem(groupName, itemName);
+    // Halted rather than stopped: a restart is not the manual stop an
+    // `unless-stopped` group is meant to remember.
+    await this.haltItem(groupName, itemName);
+    await this.startItem(groupName, itemName);
   }
 
   async stopItem(groupName: string, itemName: string): Promise<void> {
+    await this.haltItem(groupName, itemName);
+
+    if (this.restartPolicies.get(groupName) === 'unless-stopped') {
+      await this.stoppedStore.add(groupName, itemName).catch(() => {});
+    }
+  }
+
+  private async haltItem(groupName: string, itemName: string): Promise<void> {
     const managed = this.requireManaged(groupName, itemName);
 
     this.cancelPendingRestart(groupName, itemName);
@@ -298,7 +310,7 @@ export class ProcessManager extends EventEmitter {
     this.emit('item-stopped', groupName, itemName);
   }
 
-  startItem(groupName: string, itemName: string): void {
+  async startItem(groupName: string, itemName: string): Promise<void> {
     const managed = this.requireManaged(groupName, itemName);
 
     if (managed.status === 'running') {
@@ -310,6 +322,10 @@ export class ProcessManager extends EventEmitter {
     managed.process = this.spawnProcess(managed.item, groupName, this.restartPolicies.get(groupName));
     managed.status = 'running';
     managed.startedAt = Date.now();
+
+    // Unconditional, so a policy changed away from `unless-stopped` does not
+    // leave a remembered stop behind to surprise the next run.
+    await this.stoppedStore.remove(groupName, itemName).catch(() => {});
   }
 
   /** When the group was spawned. Restarting individual items does not reset it. */
