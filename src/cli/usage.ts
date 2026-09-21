@@ -12,6 +12,7 @@ Commands:
   ls <group>              List all items in the group
   groups [-v]             List all groups
   config                  Open the config file in your editor
+  config-path             Print the path of the config file
 
 Options:
   -v, --verbose           Show detailed group information
@@ -41,6 +42,7 @@ Examples:
   cligr ls test1
   cligr groups -v
   cligr config
+  cligr config-path       Print the config file path
 `;
 }
 

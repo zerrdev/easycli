@@ -16,6 +16,7 @@ import { upCommand } from '../../src/commands/up.js';
 import { lsCommand } from '../../src/commands/ls.js';
 import { groupsCommand } from '../../src/commands/groups.js';
 import { CONFIG_TEMPLATE } from '../../src/commands/config.js';
+import { configPathCommand } from '../../src/commands/config-path.js';
 import { ConfigLoader } from '../../src/config/loader.js';
 
 describe('CLI Commands Integration Tests', () => {
@@ -312,6 +313,29 @@ ${groups}
           `group ${name} has invalid restart policy: ${JSON.stringify(restart)}`
         );
       }
+    });
+  });
+
+  describe('configPathCommand', () => {
+    it('should print the path of the existing config file', () => {
+      fs.writeFileSync(testConfigPath, CONFIG_TEMPLATE);
+
+      resetOutput();
+      const exitCode = configPathCommand();
+
+      assert.strictEqual(exitCode, 0);
+      assert.strictEqual(getLogOutput(), testConfigPath);
+    });
+
+    it('should print where the config would live without creating it', () => {
+      fs.rmSync(testConfigPath, { force: true });
+
+      resetOutput();
+      const exitCode = configPathCommand();
+
+      assert.strictEqual(exitCode, 0);
+      assert.strictEqual(getLogOutput(), testConfigPath);
+      assert.ok(!fs.existsSync(testConfigPath), 'must not create the config file');
     });
   });
 

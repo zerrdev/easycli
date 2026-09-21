@@ -1,9 +1,8 @@
 import { spawn, spawnSync } from 'child_process';
 import fs from 'fs';
-import os from 'os';
 import path from 'path';
+import { resolveConfigPath } from '../config/loader.js';
 
-const CONFIG_FILENAME = '.cligr.yml';
 export const CONFIG_TEMPLATE = `# Cligr Configuration
 
 groups:
@@ -100,18 +99,7 @@ function createTemplate(filePath: string): void {
 
 export async function configCommand(): Promise<number> {
   try {
-    // Determine config path (same logic as ConfigLoader)
-    const homeDirConfig = path.join(os.homedir(), CONFIG_FILENAME);
-    const currentDirConfig = path.resolve(CONFIG_FILENAME);
-
-    let configPath: string;
-    if (fs.existsSync(homeDirConfig)) {
-      configPath = homeDirConfig;
-    } else if (fs.existsSync(currentDirConfig)) {
-      configPath = currentDirConfig;
-    } else {
-      configPath = homeDirConfig;
-    }
+    const configPath = resolveConfigPath();
 
     // Create template if doesn't exist
     if (!fs.existsSync(configPath)) {

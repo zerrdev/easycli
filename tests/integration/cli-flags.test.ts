@@ -103,7 +103,7 @@ describe('parseFlags', () => {
 
 describe('usageText', () => {
   it('should document every command the CLI accepts', () => {
-    for (const command of ['config', 'up', 'ls', 'groups']) {
+    for (const command of ['config', 'config-path', 'up', 'ls', 'groups']) {
       assert.match(usageText(), new RegExp(`\\b${command}\\b`));
     }
   });

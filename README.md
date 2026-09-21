@@ -119,6 +119,7 @@ cligr ls <group>          # List group items
 cligr groups              # List all groups
 cligr groups -v           # List groups with details
 cligr config              # Open config file in editor
+cligr config-path         # Print the config file path
 cligr --help              # Show help
 ```
 

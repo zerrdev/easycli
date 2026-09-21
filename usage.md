@@ -12,6 +12,12 @@ Shows all items from this group
 Lists all groups. Add `-v` for a detailed table.
 ## cligr config
 Open config file
+## cligr config-path
+
+Prints the path of the config file and nothing else, so it composes with other
+commands: `cat $(cligr config-path)`. The file is not created if it is missing;
+the path printed is where `cligr config` would create it.
+
 ## cligr --help
 Show usage. Also available as `-h`.
 

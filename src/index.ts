@@ -3,11 +3,13 @@
 import { upCommand } from './commands/up.js';
 import { lsCommand } from './commands/ls.js';
 import { configCommand } from './commands/config.js';
+import { configPathCommand } from './commands/config-path.js';
 import { groupsCommand } from './commands/groups.js';
 import { parseFlags } from './cli/flags.js';
 import { printUsage } from './cli/usage.js';
 
-const KNOWN_COMMANDS = ['config', 'up', 'ls', 'groups'];
+const KNOWN_COMMANDS = ['config', 'config-path', 'up', 'ls', 'groups'];
+const COMMANDS_WITHOUT_GROUP = ['config', 'config-path', 'groups'];
 
 async function main(): Promise<void> {
   // Flags are stripped up front so every branch below sees only positional
@@ -36,8 +38,7 @@ async function main(): Promise<void> {
   const command = firstArg;
   const groupName = rest[0];
 
-  // config and groups commands don't require group name
-  if (command !== 'config' && command !== 'groups' && !groupName) {
+  if (!COMMANDS_WITHOUT_GROUP.includes(command) && !groupName) {
     console.error('Error: group name required');
     printUsage();
     process.exit(1);
@@ -48,6 +49,9 @@ async function main(): Promise<void> {
   switch (command) {
     case 'config':
       exitCode = await configCommand();
+      break;
+    case 'config-path':
+      exitCode = configPathCommand();
       break;
     case 'up':
       exitCode = await upCommand(groupName, upOptions);

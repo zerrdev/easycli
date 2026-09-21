@@ -8,6 +8,24 @@ const CONFIG_FILENAME = '.cligr.yml';
 const RUN_MODES: RunMode[] = ['monitor', 'once'];
 const DEFAULT_SEPARATOR = ' ';
 
+/**
+ * The lookup order every entry point must agree on: an existing config in the
+ * home directory wins, then one in the current directory. With neither
+ * present the home path is returned as the place a config would be created.
+ */
+export function resolveConfigPath(): string {
+  const homeDirConfig = path.join(os.homedir(), CONFIG_FILENAME);
+  const currentDirConfig = path.resolve(CONFIG_FILENAME);
+
+  if (fs.existsSync(homeDirConfig)) {
+    return homeDirConfig;
+  }
+  if (fs.existsSync(currentDirConfig)) {
+    return currentDirConfig;
+  }
+  return homeDirConfig;
+}
+
 export class ConfigError extends Error {
   constructor(message: string) {
     super(message);
@@ -23,18 +41,7 @@ export class ConfigLoader {
       // User provided explicit path
       this.configPath = path.resolve(configPath);
     } else {
-      // Auto-detect: home dir first, then current dir
-      const homeDirConfig = path.join(os.homedir(), CONFIG_FILENAME);
-      const currentDirConfig = path.resolve(CONFIG_FILENAME);
-
-      if (fs.existsSync(homeDirConfig)) {
-        this.configPath = homeDirConfig;
-      } else if (fs.existsSync(currentDirConfig)) {
-        this.configPath = currentDirConfig;
-      } else {
-        // Store home dir as default, will error in load()
-        this.configPath = homeDirConfig;
-      }
+      this.configPath = resolveConfigPath();
     }
   }
 
